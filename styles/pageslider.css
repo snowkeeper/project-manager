@@ -1,0 +1,53 @@
+.pageslider-container {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.page {
+    position: fixed;
+    top: 50px;
+    box-sizing: border-box;
+    width: 65%;
+    height: 95%;
+    transition: .6s;
+    text-align: left;
+    background: #fff;
+    z-index:1000;
+    -webkit-box-shadow: -8px 2px 29px -5px rgba(51,51,51,1);
+	-moz-box-shadow: -8px 2px 29px -5px rgba(51,51,51,1);
+	box-shadow: -8px 2px 29px -5px rgba(51,51,51,1);
+}
+
+.page .slideContent {
+	padding:10px;
+}
+.page .slideHead {
+	padding:5px;
+	height: 30px;
+	
+	font-size:24px;
+	cursor: pointer;
+}
+
+.page.left {
+    transition: .6s;
+    left: 5%;
+    width: 95%;
+}
+
+.page.center {
+    transition: .6s;
+    left: 35%;
+}
+
+.page.right {
+    transition: .6s;
+	left: 110%;
+}
+
+.page.transition {
+    -webkit-transition-duration: .25s;
+    transition-duration: .25s;
+}

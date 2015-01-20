@@ -1,0 +1,144 @@
+pre {
+	word-wrap: normal;
+
+}
+
+#header {
+	margin-top: 30px;
+}
+
+#footer {
+	margin-top: 30px;
+	border-top: 1px solid @gray-lighter;
+	padding-top: 30px;
+	color: @gray-light;
+}
+
+.gallery-image img{
+    display: block;
+    max-width: 100%;
+    height: auto;
+}
+.no-pad {
+	padding:0;
+}
+.text-right {
+	text-align: right;
+}
+#infoBar {
+	background: #33343A;
+	color: #575757;
+	z-index:100;
+	height: 50px;
+	width: 100%;
+	position: fixed;
+}	
+#infoBar .infoBarLinks {
+	padding:5px;
+	font-size: 24px;
+	font-weight: normal;
+	
+}
+#infoBar #infoBarLinks {
+	background: #27282D;
+	height: 50px;
+	color: #4A4A4A;	
+}
+#infoBar #infoBarLinks .glyphicon {
+	margin:5px 10px;
+}
+#infoBar .infoBarInfo {
+	height: 50px;
+	padding:8px 10px;
+}
+	
+#infoBar #infoBarInfo .link {
+	font-size: 24px;
+	padding:5px;
+} 
+
+#infoBar .nodes {
+	padding:10px 0px;
+	font-size: 20px;
+	font-weight: normal;
+	height: 50px;
+	color: #fff;	
+	text-align:center;
+	text-decoration:none;
+	cursor:pointer;
+}
+
+#infoBar .nodes a{
+	color: #fff;
+	text-decoration:none;
+}
+
+#infoContent #itemList {
+	position: fixed;
+	padding-top:60px;
+	left: 0;
+	top: 0;
+	height:100%;
+	background: #33343A;
+	
+}
+#infoContent {
+	z-index:99;
+	width: 100%;
+	height:100%;
+}
+#infoContent .Content {
+	margin-top:50px;
+}
+
+#infoContent .module {
+	border: 1px solid #1E90FF;
+}
+
+#infoContent .string {
+	border: 1px solid #816F8A;
+}
+
+#infoContent .number {
+	border: 1px solid #B59659;
+}
+
+#infoContent .object {
+	border: 1px solid #FFAE1E;
+}
+
+#infoContent .tableRow div{
+	padding: 5px 2px;
+	margin: 2px 0;
+	overflow: hidden;
+	font-size:12px;
+}
+#infoContent .unloadDiv{
+	position: relative;
+}
+#infoContent .unloadCan{
+	position: absolute;
+	right: 0;
+	top:0;
+	width:25px;
+	height:100%;
+}
+.form .checkbox {
+	padding:5px;
+	border-radius: 4px;
+	border:1px solid #999;
+	margin:5px;
+}
+
+.logger {
+	max-height:350px;
+	overflow: auto;
+	font-size:12px;
+	padding:5px;
+
+}
+
+#Nodes .nodes {
+	margin-top: 10px;
+	cursor:pointer;
+}
