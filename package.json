@@ -56,7 +56,7 @@
   "main": "index.html",
   "window": {
     "title": "repo manager",
-    "toolbar": true,
+    "toolbar": false,
     "frame": true,
     "width": 1200,
     "height": 600,
