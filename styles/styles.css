@@ -26,7 +26,7 @@ pre {
 	text-align: right;
 }
 #infoBar {
-	background: #33343A;
+	/*background: #33343A;*/
 	color: #575757;
 	z-index:100;
 	height: 50px;
@@ -40,7 +40,7 @@ pre {
 	
 }
 #infoBar #infoBarLinks {
-	background: #27282D;
+	/*background: #27282D;*/
 	height: 50px;
 	color: #4A4A4A;	
 }
