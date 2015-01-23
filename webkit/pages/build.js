@@ -11,7 +11,7 @@ var Route = Router.Route,
 	
 var Nodes = require('../components/nodes');
 
-var BuildState = require('../components/buildState');
+var BuildState = require('../components/buildstate');
 
 var Build;
 module.exports = Build = React.createClass({
@@ -55,7 +55,7 @@ module.exports = Build = React.createClass({
 					send.building = false;
 					send.built = true;
 					Manager.App.showNodes();
-					Manager.removeListener('build',_this._watchBuild);
+					//Manager.removeListener('build',_this._watchBuild);
 				}
 				_this.setState(send);
 			} else if(s.err) {
@@ -115,7 +115,8 @@ module.exports = Build = React.createClass({
 			startError: false,
 			done: false,
 			doneError: false,
-			building:false
+			building:false,
+			built: false
 		});
 		
 	},
@@ -125,10 +126,10 @@ module.exports = Build = React.createClass({
 		var id = Manager.doc.id;
 		if(confirm('Really Remove Build Directory?')) {
 			Manager.removeNodeBuildDir(id,function(err,success) {
-				console.log(err,success);
-				if(err)console.log(err);
+				Manager.log(err,success);
+				if(err)Manager.log(err);
 				if(success) {
-					console.log('force update after directory removed');
+					Manager.log('force update after directory removed');
 					_this.getDocs();
 					//_this.setState({loading:true});
 					//_this.forceUpdate();
@@ -146,9 +147,7 @@ module.exports = Build = React.createClass({
 		if(this.state.building || this.state.built) {
 			var buildProcess = (
 				<div>
-					<p>
-						<a href="#" onClick={this.stopBuilding} >Build Again</a>
-					</p>
+					
 					<BuildState success={this.state.mkdir} error={this.state.mkdirError} working={this.state.mkdirWorking} >Create Directory</BuildState>
 					<BuildState success={this.state.pkg} error={this.state.pkgError} working={this.state.pkgWorking} >Create package.json</BuildState>
 					<BuildState success={this.state.models} error={this.state.modelsError}  working={this.state.modelsWorking} >Add Model Files</BuildState>
@@ -159,35 +158,26 @@ module.exports = Build = React.createClass({
 					<BuildState success={this.state.start} error={this.state.startError}  working={this.state.startWorking} >Run node keystone</BuildState>
 					<BuildState success={this.state.done} error={this.state.doneError}  working={this.state.doneWorking} >Finished</BuildState>
 					
-						
+					<p>
+						<br />
+						<a href="#" onClick={this.stopBuilding} >Build Again</a>
+					</p>	
 				</div>			
 			);
-		}
-		if(this.state.building) {
-			var buildDiv = "col-xs-12";
-			var activeDiv = "hidden";
-		} else {
-			//var buildDiv = "col-xs-12 col-md-7";
-			//var activeDiv = "col-xs-12 col-md-5";
 			var buildDiv = "col-xs-12";
 			var activeDiv = "hidden";
 		}
+		
 		var database = Manager.config.mongo.value ? (<span>Collection: {Manager.config.mongo.value} </span>) : (<span>Your mongo collection will be a sanitized form of <b>{Manager.config.name.value}</b></span>);
-		return (
+		var ret = (
 			<div>
 				<p />
 				<div  className="">
-					<p />
-					<div className="">
-						Current Build: &nbsp; <b>{Manager.doc.doc.name}</b>
-					</div>
-					<p />
 					<div className="clearfix" />
 				</div>
 				<p />
 				<div className="clearfix" />
-				<h3>Build Configuration</h3>
-				<p />
+				
 				<div className="form-group">
 					<label htmlFor="path" >Path to Build Directory</label>
 					<input type="text" className=" form-control" id="path" ref="path" defaultValue="testbed" placeholder={Manager.__dir} />
@@ -222,19 +212,22 @@ module.exports = Build = React.createClass({
 						<button type="button" className="btn btn-default" onClick={this.build} disabled={this.state.building} >Build Configuration</button>
 					</div>
 				</div>
-				<div>
-					<div className={buildDiv}>
-						<h3>Build</h3>
-						{buildProcess}
-						<div style={{position:'relative',height:150}} />
-					</div>
-					<div className={activeDiv}>
-						<h3>Active</h3>
-						<Nodes nodes={Manager._nodes} single="true" />
-					</div>
-				</div>
+				
 				
 			</div>
 		);
+		if(this.state.building || this.state.built) {
+			return (
+				<div>
+					<div className={buildDiv}>
+						{buildProcess}
+						<div style={{position:'relative',height:50}} />
+					</div>
+				</div>
+			);
+		
+		} else {
+			return ret;
+		}
 	}
 });

@@ -30,3 +30,7 @@ appData
 # Users Environment Variables
 .lock-wscript
 .env
+nw
+nw.pak
+icudtl.dat
+libffmpeg*

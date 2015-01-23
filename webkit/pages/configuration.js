@@ -140,10 +140,7 @@ module.exports = Configuration = React.createClass({
 		<div>
 			<p />
 			<div  className="">
-					<p />
-					<div className="">
-						Current Build: &nbsp; <b>{Manager.doc.doc.name}</b>
-					</div>
+					
 					<p />
 					<div className="clearfix" />
 				</div>

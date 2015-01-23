@@ -11,26 +11,43 @@ module.exports = Modules = React.createClass({
 	
 	saveValue: function(e) {
 		var module = this.refs.module.getDOMNode().value;
-		var version = this.refs.version.getDOMNode().value;
+		var version = this.refs.version.getDOMNode().value || 'latest';
 		//console.log('save value',module,version);
 		Manager.modules.push({module:module,version:version});
 		Manager.updateDoc({modules:Manager.modules});
+		
+		this.refs.version.getDOMNode().value = '';
+		this.refs.module.getDOMNode().value = '';
 		this.forceUpdate();
 	},
 	deleteItem: function(e) {
+		
 		e.preventDefault();
-		if(confirm('Really Delete?')) {
-			var el = $(e.target).closest('a');
+		var el = $(e.target).closest('a');
+		var _this = this;
+		
+		Manager.App.modal({
+			who:'delete module',
+			children: <div className="center-content"><h3>Delete Module?</h3></div>,
+			confirm: true,
+			class: 'modal-sm',
+		}, function() {
 			var newModules = [];
 			_.each(Manager.modules,function(v) {
-				if(v.module !== el[0].dataset.module && v.version !== el[0].dataset.version) {
+				if(v.module === el[0].dataset.module && v.version === el[0].dataset.version) {
+					// weird
+				} else {
 					newModules.push(v);
-				}				
-			},this);
+				}		
+			});
 			Manager.modules = newModules;
-			Manager.updateDoc({modules:Manager.modules});
-			this.forceUpdate();
-		}
+			Manager.updateDoc({modules:Manager.modules},function() {
+				_this.forceUpdate();
+				Manager.App.qFlash('message','Module removed as dependency',2000);
+			});
+			
+		});
+		
 	},
 	render: function() {
 		var _this = this;
@@ -44,10 +61,7 @@ module.exports = Modules = React.createClass({
 			<div>
 				<p />
 				<div  className="">
-					<p />
-					<div className="">
-						Current Build: &nbsp; <b>{Manager.doc.doc.name}</b>
-					</div>
+					
 					<p />
 					<div className="clearfix" />
 				</div>

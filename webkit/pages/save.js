@@ -7,16 +7,23 @@ var Link = Router.Link;
 
 var Save;
 module.exports = Save = React.createClass({
-	
+	getInitialState: function() {
+		return {
+			name: !Manager.doc.doc.temp ? Manager.doc.doc.name : ''
+		}
+	},
 	saveValue: function(e) {
 		var _this = this;
 		var name = this.refs.name.getDOMNode().value;
 		console.log('save config',name);
 		if(!name)return;
 		Manager.updateDoc({name:name,temp:false},function(){
-			_this.forceUpdate();	
+			Manager.App.forceUpdate();	
 		});
 		
+	},
+	onChange: function(e) {
+		this.setState({name: e.target.value});
 	},
 	render: function() {
 		
@@ -40,19 +47,19 @@ module.exports = Save = React.createClass({
 				<div className="clearfix" />
 				<p />
 				<div className="form-group">
-					<label htmlFor="path" className="col-sm-3 control-label">_id</label>
-						<div className="col-sm-9">
+					<label htmlFor="path" className="col-sm-2 control-label">_id</label>
+						<div className="col-sm-10">
 							<p className="form-control-static">{Manager.doc.id}</p>
 						</div>
 				</div>
 				<div className="form-group">
-					<label htmlFor="name" className="col-sm-3 control-label">Name</label>
-						<div className="col-sm-9">
-							<input type="text" className=" form-control" id="name" ref="name" defaultValue={name} />
+					<label htmlFor="name" className="col-sm-2 control-label">Name</label>
+						<div className="col-sm-10">
+							<input type="text" className=" form-control" id="name" ref="name" value={this.state.name} onChange={this.onChange} />
 						</div>
 				</div>
 				<div className="form-group">
-					<div className="col-sm-offset-3 col-sm-9">
+					<div className="col-sm-offset-2 col-sm-10">
 						<button type="button" className="btn btn-default" onClick={this.saveValue} >{saveText}</button>
 					</div>
 				</div>

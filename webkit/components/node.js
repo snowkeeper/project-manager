@@ -43,30 +43,29 @@ module.exports = Node = React.createClass({
 	},
 	endNode: function(e) {
 		e.preventDefault();
-		var _this = this;	
-		//console.log('nodes force update pre');	
-		this.props.node.methods.endNode(function() {
-			//console.log('nodes force update');
+		var _this = this;
+		
+		Manager.App.stopNode(this.props.node.id,function() {
 			_this.props.node.methods.removeListener(_this._addListeners);
-			Manager.App.forceUpdate();
 		});
+		
 	},
 	startNode: function(e) {
 		var _this = this;
 		e.preventDefault();
-		var id = e.target.dataset.id;
-		Manager.startNode(id,function() {
-			//console.log('transition to Nodes');
-			_this.transitionTo('Nodes');
-		});
-		
+		var p = confirm('Start this node?');
+		if(p) {
+			var id = e.target.dataset.id;
+			Manager.startNode(id,function() {
+				_this.transitionTo('Nodes');
+			});
+		}
 	},
 	viewLog: function(e) {
 		if(e)e.preventDefault();
 		var _this = this;
 		var id = this.props.node.id;
 		Manager.grabLog(id,function(err,data) {
-			//if(err)console.log(err);
 			if(data) {
 				_this.setState({
 					message : data.reverse(),
@@ -78,27 +77,41 @@ module.exports = Node = React.createClass({
 	viewConfig: function(e) {
 		e.preventDefault();
 		var _this = this;
-		
 		_this.setState({
 			cfg : !this.state.cfg
 		});
 			
 	},
+	openWindow: function(e) {
+		e.preventDefault();
+		console.log(e)
+		var href = e.target.href || e.target.parentElement.href;
+		if(href)Manager.openWindow(this.props.node.id,href);
+	},
 	render: function() {
 		var node = this.props.node;
 		var clas = node.status === 'running' ? "bg-primary" : "bg-warning";
-		var actions = node.status === 'running' || node.status === 'stale' ? <a href="#" data-id={node.id} onClick={this.endNode} >Stop</a> : <a href="#" data-id={node.id} onClick={this.startNode} >Start</a>
+		var actions = node.status === 'running' || node.status === 'stale' ? <a href="#" className="  text-success" data-id={node.id} onClick={this.endNode} ><span className="glyphicon glyphicon-stop text-success"  data-toggle="tooltip" data-placement="bottom" title="Stop the node" /></a> : <a href="#" data-id={node.id} onClick={this.startNode} >Start</a>
 		
 		var build = _.isObject(node.doc.build) && _.isObject(node.doc.build.options) ? node.doc.build.options : false;
-		var host = build ? "http://" + build.host + ':' + build.port : 'n/a';
+		
+		var host = build ? <a style={{color:'#fff'}} href={"http://" + build.host + ":" + build.port + '/keystone'} onClick={Manager.App.openWindow} >{"//" + build.host}:{build.port}</a> : <span>n/a</span>;
 		var n = 0;
 		if(this.state.cfg && build) {
 			var opts = [];
 			_.each(build,function(v,k) {
 				n++;
-				opts.push(
-					<tr key={n} ><td>{k}</td><td>{v === true ? 'true' : v === false ? 'false' : v}</td></tr>
-				);
+				if(k === 'dependencies' && _.isObject(v)) {
+					var p = [];
+					_.each(v,function(d,dk) {
+						p.push(<span key={dk + n}>{dk}@{d}<br /></span>);
+					});
+					v = p;
+				} 
+					opts.push(
+						<tr key={n} ><td>{k}</td><td>{v === true ? 'true' : v === false ? 'false' : v}</td></tr>
+					);
+				
 			});	
 			var message = (
 				<table className="table table-hover">
@@ -123,8 +136,8 @@ module.exports = Node = React.createClass({
 		return (
 			<div id={'running' + node.id}>
 					<div className={clas} style={{padding:5}}>{node.name} - {host}</div>
-					<div className="pull-left" style={{padding:5}}>pid: {node.pid || 'n/a'} </div>
-					<div className="pull-left" style={{padding:5,marginLeft:20}}> {actions} | <a href="#" data-id={node.id}  onClick={this.viewLog} >Full Log</a> | <a href="#" data-id={node.id}  onClick={this.viewConfig} >Config</a></div>
+					<div className="pull-left" style={{fontSize:16,padding:5}}>pid: {node.pid || 'n/a'} </div>
+					<div className="pull-left" style={{fontSize:20,padding:5,marginLeft:20}}> {actions} &nbsp; <a href="#" data-id={node.id}  onClick={this.viewLog} ><span className="glyphicon glyphicon-tasks" /></a> &nbsp; <a href="#" data-id={node.id}  onClick={this.viewConfig} ><span className="glyphicon glyphicon-cog"  data-toggle="tooltip" data-placement="bottom" title="View Configuration" /></a></div>
 					<div className="clearfix" />
 					<div className="logger" style={{}}>
 						{message}

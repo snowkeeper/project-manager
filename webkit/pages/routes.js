@@ -18,18 +18,31 @@ module.exports = Routes = React.createClass({
 	},
 	deleteItem: function(e) {
 		e.preventDefault();
-		if(confirm('Really Delete?')) {
-			var el = $(e.target).closest('a');
+		var el = $(e.target).closest('a');
+		var _this = this;
+		
+		Manager.App.modal({
+			who:'delete route',
+			children: <div className="center-content"><h3>Delete Route?</h3></div>,
+			confirm: true,
+			class: 'modal-sm',
+		}, function() {
 			var newRoutes = [];
-			_.each(Manager.modules,function(v) {
-				if(v.routeKey !== el[0].dataset.routeKey && v.route !== el[0].dataset.route) {
+			_.each(Manager.routes,function(v) {
+				if(v.routeKey === el[0].dataset.routeKey && v.route === el[0].dataset.route) {
+					// weird
+				} else {
 					newRoutes.push(v);
-				}				
+				}					
 			},this);
 			Manager.routes = newRoutes;
-			Manager.updateDoc({routes:Manager.routes});
-			this.forceUpdate();
-		}
+			Manager.updateDoc({routes:Manager.routes},function() {
+				_this.forceUpdate();
+				Manager.App.qFlash('message','Route removed',2000);
+			});
+			
+		});
+		
 	},
 	render: function() {
 		var _this = this;
@@ -44,10 +57,7 @@ module.exports = Routes = React.createClass({
 			<div>
 				<p />
 				<div  className="">
-					<p />
-					<div className="">
-						Current Build: &nbsp; <b>{Manager.doc.doc.name}</b>
-					</div>
+					
 					<p />
 					<div className="clearfix" />
 				</div>
@@ -78,6 +88,12 @@ module.exports = Routes = React.createClass({
 						{routes}
 					</div>
 				</div>
+				<p>
+					<br />
+					<br />
+					<br />
+				</p>
+				<p />
 			</div>
 		);
 	}

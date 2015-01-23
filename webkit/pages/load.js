@@ -19,13 +19,11 @@ module.exports = Load = React.createClass({
 		}
 	},
 	componentWillMount: function() {
-		//console.log('mount');
+		//Manager.log('mount');
 		this.forceUpdate();
 	},
 	componentDidMount: function() {
-		$(function () {
-			$('[data-toggle="tooltip"]').tooltip()
-		});
+		
 	},
 	getDocs: function(cb) {
 		if(!_.isFunction(cb))cb = function() {};
@@ -45,15 +43,18 @@ module.exports = Load = React.createClass({
 		});
 	},
 	componentWillUpdate: function() {
-		//console.log('update');
+		//Manager.log('update');
 		var _this = this;
 		
 		var load = this.getParams().load;
 		var unload = this.getParams().unload;
 		var to = this.getParams().to;
+		var newbuild = this.getParams().newbuild;
+		
+		//Manager.log(unload,load,to,newbuild);
 		
 		if(unload !== undefined) {
-			//console.log(unload,'unload');
+			//Manager.log(unload,'unload');
 			var remove = function() {
 				Manager.db.config.remove({ _id: unload }, {}, function (err, numRemoved) {
 					_this.getDocs(function() { _this.transitionTo('Load'); });
@@ -68,10 +69,14 @@ module.exports = Load = React.createClass({
 				if(to) {
 					_this.transitionTo(to);
 				} else {
-					_this.transitionTo('Version');
+					_this.transitionTo('Dashboard');
 				}
 				return false;
 			});
+			
+		} else if(newbuild === 'true') {
+		
+			_this.newDoc();
 			
 		} else if(this.state.loading === true) {
 		
@@ -79,32 +84,24 @@ module.exports = Load = React.createClass({
 		}
 			
 	},
-	newDoc: function() {
-		var _this = this;
-		Manager.newDoc(function() {
-			_this.transitionTo('Version');
-			return false;
-		});
+	newDoc: function(e) {
+		if(e)e.preventDefault();
+		Manager.App.createProject();
 	},
 	confirmDelete: function(e) {
-		if(!confirm('Really Delete?')) {
-			e.preventDefault();
-		}
+		e.preventDefault();
+		Manager.App.confirmDeleteProject(e.target.dataset.id || e.target.parentElement.dataset.id);
 	},
 	endNode: function(e) {
 		e.preventDefault();
-		var _this = this;
-		var id = e.target.dataset.id;
-		Manager._nodes[id].methods.endNode(function() {
-			Manager.App.forceUpdate();
-		});
+		Manager.App.stopNode(e.target.dataset.id || e.target.parentElement.dataset.id);
 	},
 	startNode: function(e) {
 		var _this = this;
 		e.preventDefault();
-		var id = e.target.dataset.id;
+		var id = e.target.dataset.id  || e.target.parentElement.dataset.id;
 		Manager.startNode(id,function() {
-			//console.log('transition to Nodes');
+			//Manager.log('transition to Nodes');
 			//_this.transitionTo('Nodes');
 			Manager.App.showNodes();
 		});
@@ -113,17 +110,10 @@ module.exports = Load = React.createClass({
 	removeNodeDir: function(e) {
 		var _this = this;
 		e.preventDefault();
-		var id = e.target.dataset.id;
-		if(confirm('Really Remove Build Directory?')) {
-			Manager.removeNodeBuildDir(id,function(err,success) {
-				
-				if(err)console.log(err);
-				if(success) {
-					_this.getDocs();
-				}
-			});
-		}
-			
+		var id = e.target.dataset.id || e.target.parentElement.dataset.id;
+		Manager.App.removeNodeBuildDir(id,function(){
+			_this.getDocs();
+		});	
 	},
 	render: function() {
 		
@@ -136,7 +126,9 @@ module.exports = Load = React.createClass({
 			saved.push(<tr key="load"><td colSpan="5">Loading...</td></tr>);
 		} else {
 			_.each(this.state.docs,function(v) {
-				var start = Manager._nodes[v._id] && Manager._nodes[v._id].id ? <a href="#" onClick={_this.endNode} data-id={v._id} >Stop</a> : (v.build && v.build.path) ? <a href="#" onClick={_this.startNode} data-id={v._id} >Start</a> : <Link to="LoadTo" params={{load:v._id,to:'Build'}} >Build</Link>;
+				// var start = Manager._nodes[v._id] && Manager._nodes[v._id].id ? <a href="#" onClick={_this.endNode} data-id={v._id} >Stop</a> : (v.build && v.build.path) ? <a href="#" onClick={_this.startNode} data-id={v._id} >Start</a> : <Link to="LoadTo" params={{load:v._id,to:'Build'}} >Build</Link>;
+				
+				var start = Manager._nodes[v._id] && Manager._nodes[v._id].id ? <a href="#" onClick={_this.endNode} data-id={v._id} ><span className="glyphicon glyphicon-stop  text-success"  data-toggle="tooltip" data-placement="bottom" title="Stop the node" /></a> : (v.build && v.build.path) ? <a href="#" onClick={_this.startNode} data-id={v._id} ><span className="glyphicon glyphicon-play-circle text-warning"  data-toggle="tooltip" data-placement="bottom" title="Start the node" /></a> : v.temp ? <span /> : <Link to="LoadTo" params={{load:v._id,to:'Build'}} ><span className="glyphicon glyphicon-wrench"  data-toggle="tooltip" data-placement="bottom" title="Build this configuration" /></Link>;
 				var removeDir;
 				
 				var finish = function() {
@@ -151,16 +143,19 @@ module.exports = Load = React.createClass({
 								{v.build && v.build.options ? v.build.options.version : v.version} 
 							</td>
 							<td >
+								{v.build && v.build.options ? v.build.options.port : ''} 
+							</td>
+							<td style={{fontSize:21}}>
 								{start} 
 							</td>
-							<td >
+							<td  style={{fontSize:21}}>
 								{removeDir} 
 							</td>
 							<td >
 								{moment(v.today).format("lll")}
 							</td>
-							<td className=" unloadDiv">
-								{Manager.doc && Manager.doc.id !== v._id ? (<a href={href} onClick={_this.confirmDelete} ><span className="glyphicon glyphicon-trash" /> </a>) : ''} 
+							<td className=" unloadDiv"  style={{fontSize:18}}>
+								{Manager.doc && Manager.doc.id !== v._id ? (<a href="#" data-id={v._id} onClick={_this.confirmDelete} ><span className="glyphicon glyphicon-trash   text-danger" /> </a>) : ''} 
 							</td>
 							
 						</tr>
@@ -174,7 +169,7 @@ module.exports = Load = React.createClass({
 				}
 				
 				if(_.isObject(v.build) && v.build.path) {
-					removeDir = (<a href="#" onClick={_this.removeNodeDir} data-id={v._id} >Delete Build</a>);
+					removeDir = (<a href="#" onClick={_this.removeNodeDir} data-id={v._id} ><span className="glyphicon glyphicon-remove-circle text-muted"  data-toggle="tooltip" data-placement="bottom" title="Remove build directory" /></a>);
 					finish();
 				} else {
 					finish();
@@ -187,30 +182,30 @@ module.exports = Load = React.createClass({
 				<p />
 				
 				<div  className="">
-					<p />
-					<div className="">
-						Current Build: &nbsp; <b>{Manager.doc.doc.name}</b>
-					</div>
+					
+					
 					<p />
 					<div className="clearfix" />
 				</div>
 				<p />
 				<p>
-					<button className="btn btn-primary" onClick={this.newDoc} >New Build</button>
+					
 				</p>
 				<div role="tabpanel">
 					<ul className="nav nav-tabs" role="tablist">
 						<li role="presentation" className="active"><a href="#saved" aria-controls="home" role="tab" data-toggle="tab">Saved Builds</a></li>
 						<li role="presentation"><a href="#temp" aria-controls="profile" role="tab" data-toggle="tab">Temp Builds</a></li>
+						<li role="presentation" className="pull-right"><button className="btn btn-primary" onClick={this.newDoc} > <span className="glyphicon glyphicon-plus" /> New Build</button></li>
 					</ul>
 					<div className="tab-content">
-						<div role="tabpanel" className="tab-pane active" id="saved">
+						<div role="tabpanel" className="tab-pane  active" id="saved">
 							<table className="table table-hover">
 								<thead>
 									<th>Name</th>
 									<th>Ver</th>
+									<th>Port</th>
 									<th>Action</th>
-									<th>Delete Build</th>
+									<th>Build</th>
 									<th>Created</th>
 									<th>Delete</th>
 								</thead>
@@ -220,14 +215,15 @@ module.exports = Load = React.createClass({
 							</table>
 							
 						</div>
-						<div role="tabpanel" className="tab-pane" id="temp">
+						<div role="tabpanel" className="tab-pane " id="temp">
 							<table className="table table-hover">
 								<thead>
 									
 									<th>Name</th>
 									<th>Ver</th>
+									<th>Port</th>
 									<th>Action</th>
-									<th>Delete Build</th>
+									<th>Build</th>
 									<th>Created</th>
 									<th>Delete</th>
 								</thead>

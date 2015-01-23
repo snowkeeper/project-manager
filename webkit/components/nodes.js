@@ -1,7 +1,6 @@
 
 var React =  require('react/addons');
-var Node = require('./node.js');
-var Router = require('react-router');
+var Node = require('./node');
 
 var Nodes;
 module.exports = Nodes = React.createClass({

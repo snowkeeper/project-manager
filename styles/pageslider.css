@@ -7,17 +7,18 @@
 
 .page {
     position: fixed;
-    top: 50px;
+    top: 0px;
+    padding-top:55px;
     box-sizing: border-box;
     width: 65%;
-    height: 95%;
+    height: 100%;
     transition: .6s;
     text-align: left;
     background: #fff;
-    z-index:1000;
-    -webkit-box-shadow: -8px 2px 29px -5px rgba(51,51,51,1);
-	-moz-box-shadow: -8px 2px 29px -5px rgba(51,51,51,1);
-	box-shadow: -8px 2px 29px -5px rgba(51,51,51,1);
+    z-index:98;
+    -webkit-box-shadow: -4px 2px 19px -5px rgba(51,51,51,1);
+	-moz-box-shadow: -4px 2px 19px -5px rgba(51,51,51,1);
+	box-shadow: -4px 2px 19px -5px rgba(51,51,51,1);
 }
 
 .page .slideContent {
@@ -45,6 +46,51 @@
 .page.right {
     transition: .6s;
 	left: 110%;
+}
+
+
+.menuslide {
+    position: fixed;
+    top: 0px;
+    padding-top:0px;
+    box-sizing: border-box;
+    width: 25%;
+    height: 100%;
+    transition: .6s;
+    text-align: left;
+    z-index:101;
+    -webkit-box-shadow: 4px 2px 19px -5px rgba(251,251,251,1);
+	-moz-box-shadow: 4px 2px 19px -5px rgba(251,251,251,.5);
+	box-shadow: 4px 2px 19px -5px rgba(251,251,251,.);
+	background:#2FA4E7;
+	overflow:hidden;
+}
+
+.menuslide .slideContent {
+	padding:10px;
+}
+.menuslide .slideHead {
+	padding:5px;
+	height: 30px;
+	
+	font-size:24px;
+	cursor: pointer;
+}
+
+.menuslide.right {
+    transition: .6s;
+    right: 50%;
+    width: 50%;
+}
+
+.menuslide.center {
+    transition: .6s;
+    right: 75%;
+}
+
+.menuslide.left {
+    transition: .6s;
+	right: 110%;
 }
 
 .page.transition {

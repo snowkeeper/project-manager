@@ -46,6 +46,8 @@ module.exports = Version = React.createClass({
 		
 		var val = event.target.value;
 		
+		this.refs.typen.getDOMNode().checked = true;
+		
 		_this.setState({change:true,pkg:JSON.stringify({loading:true}, null, 4)});
 		
 		Manager.getView(val,function(err,data) {
@@ -69,6 +71,8 @@ module.exports = Version = React.createClass({
 		var _this = this;
 		
 		var val = event.target.value;
+		
+		this.refs.typeb.getDOMNode().checked = true;
 		
 		_this.setState({change:true,pkg:JSON.stringify({loading:true}, null, 4)});
 		
@@ -108,10 +112,7 @@ module.exports = Version = React.createClass({
 		return (
 			<div>
 				<div  className="">
-					<p />
-					<div className="">
-						Current Build: &nbsp; <b>{Manager.doc.doc.name}</b>
-					</div>
+					
 					<p />
 					<div className="clearfix" />
 				</div>
@@ -123,7 +124,7 @@ module.exports = Version = React.createClass({
 					
 					<div  className="form-group">
 						<label className="checkbox-inline">
-							<input type="radio" onChange={this.changeType} name="type" ref="type" value="module" defaultChecked={Manager.doc.doc.type === 'module'} /> Npm Version
+							<input type="radio" onChange={this.changeType} name="type" ref="typen" value="module" defaultChecked={Manager.doc.doc.type === 'module'} /> Npm Version
 						</label>
 						 &nbsp;
 						<select  ref="npm" id="npm" name="npm" onChange={this.getVersion} className="form-control" defaultValue={Manager.version}>
@@ -138,7 +139,7 @@ module.exports = Version = React.createClass({
 				
 					<div  className ="form-group">
 						<label className="checkbox-inline">
-							<input type="radio"  onChange={this.changeType} name="type" ref="type"  value="branch" defaultChecked={Manager.doc.doc.type === 'branch'}  /> Github Branch
+							<input type="radio"  onChange={this.changeType} name="type" ref="typeb"  value="branch" defaultChecked={Manager.doc.doc.type === 'branch'}  /> Github Branch
 						</label>
 						 &nbsp;
 						<select ref="git" id="git" name="git" onChange={this.getPackage}  className="form-control" defaultValue={Manager.version || _.keys(Manager.current)[0]}>

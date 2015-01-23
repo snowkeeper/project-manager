@@ -34888,13 +34888,19 @@ var Version = require('./pages/version');
 var Configuration = require('./pages/configuration');
 var Save = require('./pages/save');
 var Build = require('./pages/build'); 
-var Nodes = require('./components/nodes'); 
-var PageSlide = require('./components/pageSlider'); 
+var SlideNodes = require('./pages/slidenodes'); 
 
+var Nodes = require('./components/nodes');
+var SlideMenu = require('./components/menuslider');
+var Modal = require('./components/modal');
+ 
+var PageSlide = require('./mixins/pageslider'); 
+var MenuSlide = require('./mixins/menuslider'); 
+var QuickFlash = require('./mixins/qflash'); 
 
 var UI = React.createClass({displayName: "UI",
   
-	mixins: [ Router.State, PageSlide ],
+	mixins: [ Router.State, MenuSlide, PageSlide, Router.Navigation],
 
 	getInitialState: function () {
 		
@@ -34908,14 +34914,221 @@ var UI = React.createClass({displayName: "UI",
 			slidePage: _this.slidePage,
 			closeSlide: function() {
 				this.setState({slideOpen: false});
-			}.bind(this)
+			}.bind(this),
+			closeSlides: function() {
+				this.slideMenu(React.createElement(SlideMenu, null),'close');
+				this.setState({slideOpen: false});
+			}.bind(this),
+			closeMenu: function() {
+				this.slideMenu(React.createElement(SlideMenu, null),'close');
+			}.bind(this),
+			openMenu: function() {
+				this.slideMenu(React.createElement(SlideMenu, null));
+			}.bind(this),
+			closeMenuOnClick: function() {
+				//$(document).on('click',Manager.App.closeListen);
+			},
+			closeListen: function(e) {
+				var el = $(e);
+				var cl = el[0].target.className = "pageslider-container";
+				Manager.log(cl);
+				if(cl) {
+					$(document).off('click',Manager.App.closeListen);
+					Manager.App.closeMenu();
+				}
+			},
+			_qFlash:{},
+			killqFlash: function(who) {
+				clearTimeout(Manager.App._qFlash[who])
+				$('.fade'+who).fadeOut();
+			},
+			qFlash:function(type,msg,delay,kill) {
+				if(isNaN(delay))delay=4000;
+				
+				var clear = function(who) {
+					clearTimeout(Manager.App._qFlash[who])
+					$('.fade'+who).fadeOut();
+				}
+				var keys = Object.keys(Manager.App._qFlash)
+				keys.forEach(function(v) {
+					if(kill || v === type)clear(v)
+				})
+				$('.fade'+type).fadeIn().find('.html').html(msg);
+				Manager.log('flash',msg);
+				Manager.App._qFlash[type] = setTimeout(function() {
+					$('.fade'+type).fadeOut();
+				},delay);
+				
+			},
+			removeNodeBuildDir: function(id,callback) {
+				Manager.log('remove build ask');
+				
+				if(_.isFunction(id)) {
+					return id('An ID is required');
+				}
+				
+				if(!_.isFunction(callback)) {
+					callback = function(){};
+				}
+				
+				if(!id) {
+					Manager.App.qFlash('error','Supply an ID to delete directory');
+					return callback('An ID is required');
+				}
+				Manager.getDocById(id,function(err,doc) {
+					Manager.App.modal({
+							who:'remove build',
+							children: React.createElement("div", {className: "center-content"}, React.createElement("h3", null, "Delete the build directory for ", doc.name, "?")),
+							confirm: true,
+							class: 'modal-sm',
+					}, function() {
+						Manager.log('remove build');
+							_this.setState({modal:false});
+							if(Manager._nodes[id] && Manager._nodes[id].pid) {
+								Manager.log('stop first');
+								Manager._nodes[id].methods.endNode(function() {
+									Manager.App.qFlash('loadingmessage','Node ' + doc.name + ' Stopped');
+									Manager.App.removeNodeDir(id,callback);
+								});
+							
+							} else {
+								Manager.App.removeNodeDir(id,callback);
+							}
+					});
+					
+				});
+				
+				
+			},
+			removeNodeDir: function(id,callback) {
+				var _this = this;
+				Manager.log('call main remove method');
+				Manager.removeNodeBuildDir(id,function(err,success) {
+					Manager.log('removed callback err success',err,success);
+					if(err) {
+						Manager.App.qFlash('error',err);
+						Manager.log(err);
+						Manager.App.forceUpdate();
+						return callback();
+					}
+					Manager.log('flash message now');
+					Manager.App.qFlash('success','Directory deleted');
+					Manager.App.forceUpdate();
+					return callback();
+				});	
+			},
+			stopNode: function(id,callback) {
+				
+				if(_.isFunction(id)) {
+					return id('An ID is required');
+				}
+				
+				if(!_.isFunction(callback)) {
+					callback = function(){};
+				}
+				
+				if(!id) {
+					Manager.App.qFlash('error','Supply an ID to stop a Node');
+					return callback('An ID is required');
+				}
+				// is this node running
+				if(!Manager._nodes[id] || !_.isObject(Manager._nodes[id].methods)) {
+					Manager.App.qFlash('error','Node was not running');
+					Manager.App.forceUpdate();
+					return callback('Node not running')
+				}
+				Manager.App.modal({
+						who:'stop',
+						children:  React.createElement("div", {className: "center-content"}, React.createElement("h3", null, "Stop node ", Manager._nodes[id].name, "?")),
+						confirm: true,
+						class: 'modal-sm',
+				}, function() {
+					Manager._nodes[id].methods.endNode(function() {
+						_this.setState({modal:false});
+						Manager.App.qFlash('message','Node ' + Manager._nodes[id].name + ' stopping',2500);
+						callback();
+					});
+				});
+				
+			},
+			confirmDeleteProject: function(id) {
+				var _this = this;
+				
+				if(!id) {
+					Manager.App.qFlash('error','No ID specified');
+				}
+				Manager.getDocById(id,function(err,doc) {
+					Manager.App.modal({
+							who:'delete project',
+							children: React.createElement("div", {className: "center-content"}, React.createElement("h3", null, "Really delete project ", doc.name, "?")),
+							confirm: true,
+							class: '',
+					}, function() {
+						Manager.App.qFlash('success','Project ' + doc.name + ' deleted');
+								_this.transitionTo('UnLoad',{unload:id});
+					});
+					
+				});
+				
+				
+			}.bind(this),
+			/* new project */
+			createProject: function(id) {
+				var _this = this;
+				
+				Manager.App.modal({
+						who:'create project',
+						children: React.createElement("div", {className: "center-content"}, React.createElement("h3", null, "Create a new project?")),
+						confirm: true,
+						class: 'modal-sm',
+				},function() {	
+					Manager.newDoc(function() {
+						_this.transitionTo('Version');
+					});
+				});
+				
+			}.bind(this),
+			modal: function(state,callback) {
+				var _this = this;
+				if(!_.isObject(state)) {
+					return Manager.App.qFlash('error','Modal details required');
+				}
+				if(!state.who || state.who === '') {
+					return Manager.App.qFlash('error','Modal name required');
+				}
+				_this.setState({
+					modal: state
+				});
+				var customListener = function(status) {
+					if(status.confirm === true) {
+						_this.setState({modal:false}, function() {
+							Manager.removeListener('modal ' + state.who,customListener);
+							callback();
+						});
+					} 
+				}
+				Manager.on('modal ' + state.who,customListener);
+				
+			}.bind(this),
+			/* new webkit window */
+			openWindow: function(e) {
+				e.preventDefault();
+				var href = e.target.href || e.target.parentElement.href;
+				var winname = e.target.dataset.window || e.target.parentElement.dataset.window || 'custom';
+				if(href)Manager.openWindow(winname,href);
+			},
+			
+			/* END Manager.App */
 		}
 		
 		return {
 			loading: true,
 			animating: false,
+			slidemenuOpen: false,
 			slideOpen: false,
             page: React.createElement("span", null),
+            menu: React.createElement("span", null),
+            modal: false
 		};
 	},
 
@@ -34973,7 +35186,7 @@ var UI = React.createClass({displayName: "UI",
 			}
 		}
 		if(this.state.loading) {
-			//console.log('will mount');
+			//Manager.log('will mount');
 			checkInit();
 		}
 		
@@ -34985,33 +35198,91 @@ var UI = React.createClass({displayName: "UI",
 			e.preventDefault();
 			menu.popup(e.originalEvent.x, e.originalEvent.y);
 		});
+		// tooltip breaks my webkit
+		$(function () {
+			//$('[data-toggle="tooltip"]').tooltip()
+		});
 		
 	},
+	/* sometimes my connection sucks so skip waiting... the events will send us to Version when they hit */
 	skipLoad: function(e) {
 		e.preventDefault();
 		this.setState({loading:false});
 	},
 	showNodes: function(e) {
 		if(e)e.preventDefault();
-		this.slidePage(React.createElement(SlidePage, {key: "Nodes"}));
+		this.slidePage(React.createElement(SlideNodes, {key: "Nodes"}));
+	},
+	showMenu: function(e) {
+		if(e)e.preventDefault();
+		this.slideMenu(React.createElement(SlideMenu, null));
+	},
+	createDoc: function(e) {
+		e.preventDefault();
+		Manager.App.createProject();
+	},
+	startNode: function(e) {
+		e.preventDefault();
+		
+			var _this = this;
+			var id = Manager.doc.id;
+			Manager.startNode(id,function() {
+				_this.showNodes();
+			});
+		
+	},
+	stopNode: function(e) {
+		e.preventDefault();
+		var id = Manager.doc.id;
+		Manager.App.stopNode(id);
+	},
+	removeNodeBuildDir: function(e) {
+		e.preventDefault();
+		
+		var id = Manager.doc.id;
+		
+		Manager.App.removeNodeBuildDir(id);
 	},
 	render: function () {
+		
+		var _this = this;
+		
+		var v = Manager.doc && Manager.doc.doc ? Manager.doc.doc : false;
+		
+		var start = React.createElement("span", null);
+		var rebuild = React.createElement("span", null);
+		if(v) {
+			start = Manager._nodes[v._id] && Manager._nodes[v._id].id ? React.createElement("a", {href: "#", onClick: _this.stopNode, "data-id": v._id}, React.createElement("span", {className: "glyphicon glyphicon-stop text-success", "data-toggle": "tooltip", "data-placement": "bottom", title: "Stop the node"})) : (v.build && v.build.path) ? React.createElement("a", {href: "#", onClick: _this.startNode, "data-id": v._id}, React.createElement("span", {className: "glyphicon glyphicon-play-circle text-warning", "data-toggle": "tooltip", "data-placement": "bottom", title: "Start the node"})) : v.temp ? React.createElement("span", null) : React.createElement(Link, {to: "Build"}, React.createElement("span", {className: "glyphicon glyphicon-wrench", "data-toggle": "tooltip", "data-placement": "bottom", title: "Build this configuration"}));
+			
+			if(v.build && v.build.path) {
+				rebuild = React.createElement("a", {href: "#", onClick: _this.removeNodeBuildDir, "data-id": v._id}, React.createElement("span", {className: "glyphicon glyphicon-remove-circle text-muted", "data-toggle": "tooltip", "data-placement": "bottom", title: "Remove build directory"})) 
+			}
+			
+		}
 		var section = (this.getPathname() || '/Home').slice(1);
-			var lis = (
+		
+		var bClass = (Manager.doc.doc && !Manager.doc.doc.temp) ? '' : 'hidden';
+		
+		var lis = (
 			React.createElement("ul", {className: "nav nav-pills nav-stacked"}, 
-			React.createElement("li", {className: section === 'Load' ? 'active':''}, React.createElement(Link, {to: "Load"}, "New / Manage"), " "), 
 			React.createElement("li", {className: section === 'Version' ? 'active':''}, React.createElement(Link, {to: "Version"}, "Version")), 
 			React.createElement("li", {className: section === 'Configuration' ? 'active':''}, React.createElement(Link, {to: "Configuration"}, "Configuration")), 
 			React.createElement("li", {className: section === 'Modules' ? 'active':''}, React.createElement(Link, {to: "Modules"}, "Modules")), 
 			React.createElement("li", {className: section === 'Models' ? 'active':''}, React.createElement(Link, {to: "Models"}, "Models")), 
 			React.createElement("li", {className: section === 'Routes' ? 'active':''}, React.createElement(Link, {to: "Routes"}, "Routes")), 
-			React.createElement("li", {className: section === 'Save' ? 'active':''}, React.createElement(Link, {to: "Save"}, "Save")), 
-			React.createElement("li", {className: section === 'Build' ? 'active':''}, React.createElement(Link, {to: "Build"}, "Build"))
+			React.createElement("li", {className: section === 'Save' ? 'active':''}, React.createElement(Link, {to: "Save"}, Manager.doc.doc ? Manager.doc.doc.name : 'Save')), 
+			
+			React.createElement("li", {className: section === 'Build' ? 'active ' + bClass : bClass}, React.createElement(Link, {to: "Build"}, "Build"))
 			)
 		);
+		
+		/* a quick loading screen */
 		if(this.state.loading) {
+			
 			var branches = this.state.branchesFail ?  React.createElement("p", {className: "text-danger"}, React.createElement("span", {className: "glyphicon glyphicon-remove"}), " Branches failed to load.", React.createElement("br", null), this.state.branchesMessage) : this.state.branches ? React.createElement("p", {className: "text-success"}, React.createElement("span", {className: "glyphicon glyphicon-ok"}), " Branches loaded") : React.createElement("p", {className: "text-info"}, "Branches loading...");
+			
 			var versions = this.state.versionsFail ?  React.createElement("p", {className: "text-danger"}, React.createElement("span", {className: "glyphicon glyphicon-remove"}), " NPM Versions failed to load.", React.createElement("br", null), this.state.versionsMessage) : this.state.versions ? React.createElement("p", {className: "text-success"}, React.createElement("span", {className: "glyphicon glyphicon-ok"}), " NPM versions loaded") : React.createElement("p", {className: "text-info"}, "NPM versions loading...");
+			
 			var route = (
 				React.createElement("div", null, 
 					React.createElement("h3", null, "Loading..."), 
@@ -35024,40 +35295,76 @@ var UI = React.createClass({displayName: "UI",
 					
 				)
 			);
+			
 		} else {
 			var route = React.createElement(RouteHandler, null);
 		}
+		/* any _nodes */
 		var running;
 		var len = _.size(Manager._nodes);
 		if(len) {
 			running = (
 				React.createElement("div", {className: "bg-primary nodes", onClick: this.showNodes}, 
-					len, " active ", len > 1 ? ' Nodes' : ' Node'
+					len, " active ", len > 1 ? ' Nodes' : ' Node', " ", React.createElement("span", {className: "glyphicon glyphicon-transfer transfer"})
 				)
 			);
 		}
 		
-		var slider;
+		/* the build logger panel */
+		var slider = this.slideRender();
+		/* menu panel */
+		var menu = this.slideMenuRender();
+		var menuOpener = this.state.slidemenuOpen ? "glyphicon glyphicon-chevron-left" : "glyphicon glyphicon-menu-hamburger" ;
 		
-		slider = this.slideRender();
-
+		/* modal */
+		var renderModal;		
+			var modal = this.state.modal || {};
+			var cancel = function() {
+				_this.setState({modal:false});
+			}
+			var confirm = function() {
+				if(_.isFunction(modal.confirm)) {
+					modal.confirm();
+				}
+				_this.setState({modal:false});
+			}
+		renderModal = React.createElement(Modal, {class: modal.class, animate: true, open: modal.who, cancel: cancel, who: modal.who, header: modal.header, confirm: true, buttons: modal.buttons}, modal.children);
+		
 		return (
 				React.createElement("div", {id: "wrap", className: ""}, 
+					renderModal, 
 					slider, 
+					menu, 
+					
 					React.createElement("div", {id: "infoBar", className: ""}, 
-						React.createElement("div", {className: "col-xs-3 infoBarLinks", id: "infoBarLinks"}, 
-							React.createElement("div", {className: "list"}, 
-								React.createElement("span", {className: "glyphicon glyphicon-list-alt"}), 
-								"Keystone"
+						React.createElement("div", {className: "col-xs-3 ", id: ""}, 
+							React.createElement("div", {className: "list", style: {cursor:'pointer'}}, 
+								React.createElement("div", {className: "dashboard pull-left"}, 
+									React.createElement("a", {href: "#", onClick: this.showMenu}, React.createElement("span", {"data-toggle": "tooltip", "data-placement": "bottom", title: "Change Builds", className: menuOpener}))
+								), 
+								React.createElement("div", {className: "dashboard pull-right"}, 
+									React.createElement(Link, {to: "Dashboard"}, React.createElement("span", {"data-toggle": "tooltip", "data-placement": "bottom", title: "Dashboard", className: "glyphicon glyphicon-dashboard"}))
+								), 
+								
+								React.createElement("div", {className: "dashboard pull-right"}, 
+									React.createElement("a", {href: "#", onClick: this.createDoc}, React.createElement("span", {"data-toggle": "tooltip", "data-placement": "bottom", title: "Start a new build", className: "glyphicon glyphicon-plus-sign"}))
+								)
+								
 							)
 				
 						), 
 						React.createElement("div", {className: "col-xs-9  no-pad", id: ""}, 
-							React.createElement("div", {className: "list col-xs-9 infoBarLinks infoBarInfo"}, 
-								section
+							React.createElement("div", {className: "build col-xs-7 no-pad"}, 
+								React.createElement("div", {className: "pull-left play"}, start), 
+								React.createElement("div", {className: "pull-left play"}, rebuild), 
+								React.createElement("div", {className: "pull-left", style: {marginLeft:10}}, React.createElement("h3", null, Manager.doc.doc ? Manager.doc.doc.name : 'Loading...'))
+							), 
+							React.createElement("div", {className: "col-xs-2"}
+								
 							), 
 							React.createElement("div", {className: "no-pad col-xs-3 "}, 
 								running
+								
 							)
 						)
 					), 
@@ -35071,6 +35378,7 @@ var UI = React.createClass({displayName: "UI",
 							
 						), 
 						React.createElement("div", {className: "Content col-xs-offset-3 col-xs-9"}, 
+							React.createElement("h3", null, section), 
 							route
 						)
 					)
@@ -35083,72 +35391,7 @@ var UI = React.createClass({displayName: "UI",
 });
 
 
-var SlidePage = React.createClass({displayName: "SlidePage",
-    getInitialState: function () {
-		return {
-			nodesViewList: _.size(Manager._nodes) > 0 ? false : true,
-			norender: this.props.norender
-		}
-		
-	},
-	componentWillReceiveProps: function(p) {
-		if(p.norender)this.setState({norender:p.norender});
-	},
-	componentWillUpdate: function() {
-		//if(!this.state.nodesViewList && _.size(Manager._nodes) > 1) this.setState({nodesViewList:true,norender:false});
-		
-	},
-    closeNodes: function(e) {
-		if(e)e.preventDefault();
-		Manager.App.slidePage(React.createElement(SlidePage, {key: "Nodes", norender: true}));
-	},
-	wideNodes: function(e) {
-		if(e)e.preventDefault();
-		Manager.App.slidePage(React.createElement(SlidePage, {key: "Nodes", norender: true}),'wide');
-	},
-	changeView: function() {
-		this.setState({nodesViewList:!this.state.nodesViewList,norender:false});
-	},
-    render: function () {
-        var ret;
-        if(this.props.slideOpen) {
-			if(!this.state.nodesViewList) {
-				var view = React.createElement("a", {href: "#", onClick: this.changeView}, React.createElement("span", {className: "text-muted glyphicon glyphicon-th-large"}))
-			} else {
-				var view = React.createElement("a", {href: "#", onClick: this.changeView}, React.createElement("span", {className: "text-muted glyphicon glyphicon-th-list"}))
-			}
-			var widenode;
-			if(this.props.position !== 'left') {
-				widenode = (
-					React.createElement("div", {className: "slideHead text-primary col-xs-1", onClick: this.wideNodes}, 
-						React.createElement("span", {className: "glyphicon glyphicon-chevron-left"})
-					)
-				);
-			}
-			ret = (
-				React.createElement("div", null, 
-					widenode, 
-					React.createElement("div", {className: "slideHead text-primary col-xs-9", onClick: this.closeNodes}, 
-						React.createElement("span", {className: "glyphicon glyphicon-chevron-right"})
-					), 
-					React.createElement("div", {className: "slideHead text-right  col-xs-2"}, 
-						view
-					), 
-					
-					React.createElement("div", {className: "clearfix"}), 
-					React.createElement("div", {className: "slideContent"}, 
-						React.createElement(Nodes, {single: !this.state.nodesViewList, norender: this.state.norender})
-					)
-				)
-			);
-		}
-        return (
-            React.createElement("div", {className: "page " + this.props.position}, 
-				ret
-            )
-        );
-    }
-});
+
 
 var NotFound = React.createClass({displayName: "NotFound",
   render: function () {
@@ -35175,7 +35418,10 @@ var routes = (
 		React.createElement(Route, {name: "Modules", path: "Modules", handler: Modules}), 
 		React.createElement(Route, {name: "Routes", path: "Routes", handler: Routes}), 
 		React.createElement(Route, {name: "Save", path: "Save", handler: Save}), 
-		React.createElement(Route, {name: "Load", path: "Load", handler: Load}), 
+		React.createElement(Route, {name: "Load", path: "Dashboard", handler: Load}), 
+		React.createElement(Route, {name: "NewBuild", path: "NewBuild/:newbuild", handler: Load}), 
+		React.createElement(Route, {name: "Dashboard", path: "Dashboard", handler: Load}), 
+		
 		React.createElement(Route, {name: "Loader", path: "Load/:load", handler: Load}), 
 		React.createElement(Route, {name: "LoadTo", path: "Load/:load/:to", handler: Load}), 
 		React.createElement(Route, {name: "UnLoad", path: "UnLoad/:unload", handler: Load}), 
@@ -35190,7 +35436,7 @@ Router.run(routes,  function (Handler) {
   React.render(React.createElement(Handler, null), document.getElementById('contents'));
 });
 
-},{"./components/nodes":"/home/snow/projects/webkit/keystone-manager/webkit/components/nodes.js","./components/pageSlider":"/home/snow/projects/webkit/keystone-manager/webkit/components/pageSlider.js","./pages/build":"/home/snow/projects/webkit/keystone-manager/webkit/pages/build.js","./pages/configuration":"/home/snow/projects/webkit/keystone-manager/webkit/pages/configuration.js","./pages/load":"/home/snow/projects/webkit/keystone-manager/webkit/pages/load.js","./pages/models":"/home/snow/projects/webkit/keystone-manager/webkit/pages/models.js","./pages/modules":"/home/snow/projects/webkit/keystone-manager/webkit/pages/modules.js","./pages/routes":"/home/snow/projects/webkit/keystone-manager/webkit/pages/routes.js","./pages/save":"/home/snow/projects/webkit/keystone-manager/webkit/pages/save.js","./pages/version":"/home/snow/projects/webkit/keystone-manager/webkit/pages/version.js","./pkg/config.js":"/home/snow/projects/webkit/keystone-manager/webkit/pkg/config.js","lodash":"/home/snow/projects/webkit/keystone-manager/node_modules/lodash/dist/lodash.js","moment":"/home/snow/projects/webkit/keystone-manager/node_modules/moment/moment.js","react-router":"/home/snow/projects/webkit/keystone-manager/node_modules/react-router/modules/index.js","react/addons":"/home/snow/projects/webkit/keystone-manager/node_modules/react/addons.js"}],"/home/snow/projects/webkit/keystone-manager/webkit/components/buildState.js":[function(require,module,exports){
+},{"./components/menuslider":"/home/snow/projects/webkit/keystone-manager/webkit/components/menuslider.js","./components/modal":"/home/snow/projects/webkit/keystone-manager/webkit/components/modal.js","./components/nodes":"/home/snow/projects/webkit/keystone-manager/webkit/components/nodes.js","./mixins/menuslider":"/home/snow/projects/webkit/keystone-manager/webkit/mixins/menuslider.js","./mixins/pageslider":"/home/snow/projects/webkit/keystone-manager/webkit/mixins/pageslider.js","./mixins/qflash":"/home/snow/projects/webkit/keystone-manager/webkit/mixins/qflash.js","./pages/build":"/home/snow/projects/webkit/keystone-manager/webkit/pages/build.js","./pages/configuration":"/home/snow/projects/webkit/keystone-manager/webkit/pages/configuration.js","./pages/load":"/home/snow/projects/webkit/keystone-manager/webkit/pages/load.js","./pages/models":"/home/snow/projects/webkit/keystone-manager/webkit/pages/models.js","./pages/modules":"/home/snow/projects/webkit/keystone-manager/webkit/pages/modules.js","./pages/routes":"/home/snow/projects/webkit/keystone-manager/webkit/pages/routes.js","./pages/save":"/home/snow/projects/webkit/keystone-manager/webkit/pages/save.js","./pages/slidenodes":"/home/snow/projects/webkit/keystone-manager/webkit/pages/slidenodes.js","./pages/version":"/home/snow/projects/webkit/keystone-manager/webkit/pages/version.js","./pkg/config.js":"/home/snow/projects/webkit/keystone-manager/webkit/pkg/config.js","lodash":"/home/snow/projects/webkit/keystone-manager/node_modules/lodash/dist/lodash.js","moment":"/home/snow/projects/webkit/keystone-manager/node_modules/moment/moment.js","react-router":"/home/snow/projects/webkit/keystone-manager/node_modules/react-router/modules/index.js","react/addons":"/home/snow/projects/webkit/keystone-manager/node_modules/react/addons.js"}],"/home/snow/projects/webkit/keystone-manager/webkit/components/buildstate.js":[function(require,module,exports){
 
 var React =  require('react');
 
@@ -35226,6 +35472,270 @@ module.exports = BuildState = React.createClass({displayName: "BuildState",
 		);		
 	}
 	
+});
+
+},{"react":"/home/snow/projects/webkit/keystone-manager/node_modules/react/react.js"}],"/home/snow/projects/webkit/keystone-manager/webkit/components/menuslider.js":[function(require,module,exports){
+
+var React =  require('react');
+ 
+
+var SlideMenu;
+module.exports = SlideMenu = React.createClass({displayName: "SlideMenu",
+	
+    getInitialState: function () {
+		return {
+			norender: this.props.norender,
+			loading:true,
+			temp: false
+		}
+		
+	},
+	getDefaultProps: function () {
+		return {
+			norender: false,
+			position: 'center',
+		}
+		
+	},
+	componentWillReceiveProps: function(p) {
+		if(p.norender) {
+			this.setState({norender:p.norender});
+		}
+	},
+	getDocs: function(cb) {
+		if(!_.isFunction(cb))cb = function() {};
+		
+		var _this = this;
+			
+		Manager.db.config
+		.find({})
+		.sort({ today: -1 })
+		.exec(function(err,docs) {
+			if(_this.isMounted()) {
+				_this.setState({
+					docs:docs,
+					loading:false
+				},cb);
+			}
+		});
+	},
+	componentWillMount: function() {
+		this.forceUpdate();
+	},
+	componentWillUpdate: function() {
+		this.getDocs();
+	},
+	componentDidUpdate: function() {
+		Manager.App.closeMenuOnClick();
+	},
+	shouldComponentUpdate: function() {
+		return !this.props.norender;
+	},
+	closeMenu: function(e) {
+		e.preventDefault();
+		Manager.App.closeMenu();
+	},
+	endNode: function(e) {
+		e.preventDefault();
+		Manager.App.stopNode(e.target.dataset.id || e.target.parentElement.dataset.id);
+	},
+	startNode: function(e) {
+		var _this = this;
+		e.preventDefault();
+		var id = e.target.dataset.id  || e.target.parentElement.dataset.id;
+		Manager.startNode(id,function() {
+			//Manager.log('transition to Nodes');
+			//_this.transitionTo('Nodes');
+			Manager.App.showNodes();
+		});
+		
+	},
+	removeNodeDir: function(e) {
+		var _this = this;
+		e.preventDefault();
+		var id = e.target.dataset.id || e.target.parentElement.dataset.id;
+		Manager.App.removeNodeBuildDir(id,function(){
+			_this.getDocs();
+		});	
+	},
+	goto: function(e) {
+		e.preventDefault();
+		var id = e.target.dataset.id || e.target.parentElement.dataset.id;
+		Manager.switchDoc(id,function() {
+			Manager.App.closeMenu();
+			Manager.App.forceUpdate();
+		});
+		
+	},
+	changeView: function(e) {
+		e.preventDefault();
+		var temp = e.target.dataset.view || e.target.parentElement.dataset.view
+		temp = temp == 'temp' ? true : false;
+		this.setState({temp:temp});
+	},
+    render: function () {
+		var _this = this;
+			var head = (
+				React.createElement("div", null, 
+				React.createElement("nav", {className: "navbar navbar-default"}, 
+				  React.createElement("div", {className: "container-fluid"}, 
+					 React.createElement("div", {className: "navbar-header"}, 
+						React.createElement("a", {href: "#", onClick: this.closeMenu}, React.createElement("span", {className: "navbar-brand glyphicon glyphicon-chevron-left"}))
+					), 
+
+					React.createElement("div", {className: "collapse navbar-collapse", id: "bs-example-navbar-collapse-1"}, 
+					  React.createElement("ul", {className: "nav navbar-nav"}, 
+						React.createElement("li", {className: this.state.temp ? '' : ' active'}, React.createElement("a", {href: "#", onClick: this.changeView, "data-view": "saved"}, "Saved ", React.createElement("span", {className: "sr-only"}, "(current)"))), 
+						React.createElement("li", {className: this.state.temp ? 'active' : ' '}, React.createElement("a", {href: "#", onClick: this.changeView, "data-view": "temp"}, "Temp"))
+					  )
+					)
+					
+				  )
+				)
+				)
+			);
+		var temp = [];
+		var saved = [];
+		
+		if(this.state.loading) {
+			saved.push(React.createElement("tr", {key: "load"}, React.createElement("td", {colSpan: "5"}, "Loading...")));
+		} else {
+			_.each(this.state.docs,function(v) {
+				var build = _.isObject(v.build) && _.isObject(v.build.options) ? v.build.options : false;
+				var host = (build && Manager._nodes[v._id]) ? React.createElement("a", {href: "http://" + build.host + ":" + build.port + '/keystone', onClick: Manager.App.openWindow, "data-window": build.port}, build.port) : build ? React.createElement("span", null, build.port) : React.createElement("span", null);
+				var start = Manager._nodes[v._id] && Manager._nodes[v._id].id ? React.createElement("a", {href: "#", onClick: _this.endNode, "data-id": v._id}, React.createElement("span", {className: "glyphicon glyphicon-stop text-success", "data-toggle": "tooltip", "data-placement": "bottom", title: "Stop the node"})) : (v.build && v.build.path) ? React.createElement("a", {href: "#", onClick: _this.startNode, "data-id": v._id}, React.createElement("span", {className: "glyphicon glyphicon-play-circle text-warning", "data-toggle": "tooltip", "data-placement": "bottom", title: "Start the node"})) : v.temp ? React.createElement("span", null) : React.createElement("a", {href: "#/Load/" + v._id + "/Build", onClick: Manager.App.closeMenu}, React.createElement("span", {className: "glyphicon glyphicon-wrench", "data-toggle": "tooltip", "data-placement": "bottom", title: "Build this configuration"}));
+				var removeDir;
+				var finish = function() {
+					var ret = (
+						React.createElement("tr", {key: v._id, className: "tableRow hover active"}, 
+							
+							React.createElement("td", null, 
+								removeDir, "  ", start
+							), 
+							React.createElement("td", null, 
+								React.createElement("span", {"data-toggle": "tooltip", "data-placement": "bottom", title: "switch to " + v.name}, React.createElement("a", {onClick: _this.goto, href: "#", "data-id": v._id}, v.name))
+							), 
+							React.createElement("td", null, 
+								v.build && v.build.options ? v.build.options.version : v.version
+							), 
+							
+							React.createElement("td", null, 
+								host
+							)
+						)
+					);
+					if(v.temp) {
+						temp.push(ret);
+					} else {
+						
+						saved.push(ret);
+					}
+				}
+				
+				if(v.build && v.build.path) {
+					removeDir = (React.createElement("a", {href: "#", onClick: _this.removeNodeDir, "data-id": v._id}, React.createElement("span", {className: "glyphicon glyphicon-remove-circle text-muted", "data-toggle": "tooltip", "data-placement": "bottom", title: "Remove build directory"})));
+					finish();
+				} else {
+					finish();
+				}
+				
+			},this);
+		}
+		var results = this.state.temp ? temp : saved;
+        return (
+            React.createElement("div", {className: "menuslide " + this.props.position}, 
+				head, 
+				React.createElement("table", {className: "table table-hover"}, 
+					React.createElement("tbody", null, 
+						results
+					)
+				)
+            )
+        );
+    }
+});
+
+},{"react":"/home/snow/projects/webkit/keystone-manager/node_modules/react/react.js"}],"/home/snow/projects/webkit/keystone-manager/webkit/components/modal.js":[function(require,module,exports){
+var React =  require('react');
+
+var Modal;
+module.exports = Modal = React.createClass({displayName: "Modal",
+    getInitialState: function() {
+		return {
+			modalIsOpen: false,
+		}
+	},
+	componentWillReceiveProps: function(p) {
+		if(p.open) {
+			this.openModal();
+		}
+	},
+	componentDidMount: function() {
+		var _this = this;
+		$('#theModal').on('hide.bs.modal', function (e) {
+			if(_this.props.cancel) _this.props.cancel();
+		})
+	},
+	openModal: function() {
+		this.setState({modalIsOpen: true});
+		$('#theModal').modal('show')
+	},
+
+	closeModal: function() {
+		this.setState({modalIsOpen: false});
+		$('#theModal').modal('hide')
+	},
+	
+	confirm: function() {
+		Manager.emit('modal ' + this.props.who,{who:this.props.who,confirm:true});
+		this.closeModal();
+		if('function' === typeof this.props.confirm) this.props.confirm();
+	},
+	
+	cancel: function() {
+		Manager.emit('modal ' + this.props.who,{who:this.props.who,confirm:false});
+		this.closeModal();
+		if(this.props.cancel) this.props.cancel();
+	},
+
+	render: function() {
+		
+		var modalClass = 'modal animate ';
+		var dialogClass = 'modal-dialog ' + (this.props.class ? ' ' + this.props.class : '');
+		var head = React.createElement("span", {className: "glyphicon glyphicon-question-sign"});
+		if(this.props.header) {
+			head = (React.createElement("h3", {className: "modal-title"}, this.props.header));
+		}
+		
+		var confirm = React.createElement("span", null);
+		if(this.props.confirm) {
+			confirm = (React.createElement("button", {type: "button", className: "btn btn-warning pull-left", onClick: this.confirm}, "OK"));
+		}
+		return (
+			React.createElement("div", null, 
+				React.createElement("div", {className: modalClass, id: "theModal"}, 
+					React.createElement("div", {className: dialogClass}, 
+						React.createElement("div", {className: "modal-content"}, 
+							React.createElement("div", {className: "modal-header"}, 
+								React.createElement("button", {type: "button", className: "close", onClick: this.cancel}, React.createElement("span", {"aria-hidden": "true"}, "×")), 
+								head
+							), 
+							React.createElement("div", {className: "modal-body"}, 
+								this.props.children
+							), 
+							React.createElement("div", {className: "modal-footer"}, 
+								confirm, 
+								this.props.buttons, 
+								React.createElement("button", {type: "button", className: "btn btn-default", onClick: this.cancel}, "cancel")
+							)
+						)
+					)
+				), 
+				React.createElement("div", {className: "modal-backdrop"})
+			)
+		);
+	}
+
 });
 
 },{"react":"/home/snow/projects/webkit/keystone-manager/node_modules/react/react.js"}],"/home/snow/projects/webkit/keystone-manager/webkit/components/node.js":[function(require,module,exports){
@@ -35274,30 +35784,29 @@ module.exports = Node = React.createClass({displayName: "Node",
 	},
 	endNode: function(e) {
 		e.preventDefault();
-		var _this = this;	
-		//console.log('nodes force update pre');	
-		this.props.node.methods.endNode(function() {
-			//console.log('nodes force update');
+		var _this = this;
+		
+		Manager.App.stopNode(this.props.node.id,function() {
 			_this.props.node.methods.removeListener(_this._addListeners);
-			Manager.App.forceUpdate();
 		});
+		
 	},
 	startNode: function(e) {
 		var _this = this;
 		e.preventDefault();
-		var id = e.target.dataset.id;
-		Manager.startNode(id,function() {
-			//console.log('transition to Nodes');
-			_this.transitionTo('Nodes');
-		});
-		
+		var p = confirm('Start this node?');
+		if(p) {
+			var id = e.target.dataset.id;
+			Manager.startNode(id,function() {
+				_this.transitionTo('Nodes');
+			});
+		}
 	},
 	viewLog: function(e) {
 		if(e)e.preventDefault();
 		var _this = this;
 		var id = this.props.node.id;
 		Manager.grabLog(id,function(err,data) {
-			//if(err)console.log(err);
 			if(data) {
 				_this.setState({
 					message : data.reverse(),
@@ -35309,27 +35818,41 @@ module.exports = Node = React.createClass({displayName: "Node",
 	viewConfig: function(e) {
 		e.preventDefault();
 		var _this = this;
-		
 		_this.setState({
 			cfg : !this.state.cfg
 		});
 			
 	},
+	openWindow: function(e) {
+		e.preventDefault();
+		console.log(e)
+		var href = e.target.href || e.target.parentElement.href;
+		if(href)Manager.openWindow(this.props.node.id,href);
+	},
 	render: function() {
 		var node = this.props.node;
 		var clas = node.status === 'running' ? "bg-primary" : "bg-warning";
-		var actions = node.status === 'running' || node.status === 'stale' ? React.createElement("a", {href: "#", "data-id": node.id, onClick: this.endNode}, "Stop") : React.createElement("a", {href: "#", "data-id": node.id, onClick: this.startNode}, "Start")
+		var actions = node.status === 'running' || node.status === 'stale' ? React.createElement("a", {href: "#", className: "  text-success", "data-id": node.id, onClick: this.endNode}, React.createElement("span", {className: "glyphicon glyphicon-stop text-success", "data-toggle": "tooltip", "data-placement": "bottom", title: "Stop the node"})) : React.createElement("a", {href: "#", "data-id": node.id, onClick: this.startNode}, "Start")
 		
 		var build = _.isObject(node.doc.build) && _.isObject(node.doc.build.options) ? node.doc.build.options : false;
-		var host = build ? "http://" + build.host + ':' + build.port : 'n/a';
+		
+		var host = build ? React.createElement("a", {style: {color:'#fff'}, href: "http://" + build.host + ":" + build.port + '/keystone', onClick: Manager.App.openWindow}, "//" + build.host, ":", build.port) : React.createElement("span", null, "n/a");
 		var n = 0;
 		if(this.state.cfg && build) {
 			var opts = [];
 			_.each(build,function(v,k) {
 				n++;
-				opts.push(
-					React.createElement("tr", {key: n}, React.createElement("td", null, k), React.createElement("td", null, v === true ? 'true' : v === false ? 'false' : v))
-				);
+				if(k === 'dependencies' && _.isObject(v)) {
+					var p = [];
+					_.each(v,function(d,dk) {
+						p.push(React.createElement("span", {key: dk + n}, dk, "@", d, React.createElement("br", null)));
+					});
+					v = p;
+				} 
+					opts.push(
+						React.createElement("tr", {key: n}, React.createElement("td", null, k), React.createElement("td", null, v === true ? 'true' : v === false ? 'false' : v))
+					);
+				
 			});	
 			var message = (
 				React.createElement("table", {className: "table table-hover"}, 
@@ -35354,8 +35877,8 @@ module.exports = Node = React.createClass({displayName: "Node",
 		return (
 			React.createElement("div", {id: 'running' + node.id}, 
 					React.createElement("div", {className: clas, style: {padding:5}}, node.name, " - ", host), 
-					React.createElement("div", {className: "pull-left", style: {padding:5}}, "pid: ", node.pid || 'n/a', " "), 
-					React.createElement("div", {className: "pull-left", style: {padding:5,marginLeft:20}}, " ", actions, " | ", React.createElement("a", {href: "#", "data-id": node.id, onClick: this.viewLog}, "Full Log"), " | ", React.createElement("a", {href: "#", "data-id": node.id, onClick: this.viewConfig}, "Config")), 
+					React.createElement("div", {className: "pull-left", style: {fontSize:16,padding:5}}, "pid: ", node.pid || 'n/a', " "), 
+					React.createElement("div", {className: "pull-left", style: {fontSize:20,padding:5,marginLeft:20}}, " ", actions, "   ", React.createElement("a", {href: "#", "data-id": node.id, onClick: this.viewLog}, React.createElement("span", {className: "glyphicon glyphicon-tasks"})), "   ", React.createElement("a", {href: "#", "data-id": node.id, onClick: this.viewConfig}, React.createElement("span", {className: "glyphicon glyphicon-cog", "data-toggle": "tooltip", "data-placement": "bottom", title: "View Configuration"}))), 
 					React.createElement("div", {className: "clearfix"}), 
 					React.createElement("div", {className: "logger", style: {}}, 
 						message
@@ -35369,8 +35892,7 @@ module.exports = Node = React.createClass({displayName: "Node",
 },{"moment":"/home/snow/projects/webkit/keystone-manager/node_modules/moment/moment.js","react-router":"/home/snow/projects/webkit/keystone-manager/node_modules/react-router/modules/index.js","react/addons":"/home/snow/projects/webkit/keystone-manager/node_modules/react/addons.js"}],"/home/snow/projects/webkit/keystone-manager/webkit/components/nodes.js":[function(require,module,exports){
 
 var React =  require('react/addons');
-var Node = require('./node.js');
-var Router = require('react-router');
+var Node = require('./node');
 
 var Nodes;
 module.exports = Nodes = React.createClass({displayName: "Nodes",
@@ -35423,11 +35945,33 @@ module.exports = Nodes = React.createClass({displayName: "Nodes",
 	
 });
 
-},{"./node.js":"/home/snow/projects/webkit/keystone-manager/webkit/components/node.js","react-router":"/home/snow/projects/webkit/keystone-manager/node_modules/react-router/modules/index.js","react/addons":"/home/snow/projects/webkit/keystone-manager/node_modules/react/addons.js"}],"/home/snow/projects/webkit/keystone-manager/webkit/components/pageSlider.js":[function(require,module,exports){
+},{"./node":"/home/snow/projects/webkit/keystone-manager/webkit/components/node.js","react/addons":"/home/snow/projects/webkit/keystone-manager/node_modules/react/addons.js"}],"/home/snow/projects/webkit/keystone-manager/webkit/mixins/menuslider.js":[function(require,module,exports){
+var React =  require('react/addons');
+
+var MenuSlider;
+module.exports = MenuSlider = {
+    slideMenu: function (menu,open) {
+        var state = open === 'closed' ? false : open ? true : this.state.slidemenuOpen
+        if(menu) {
+			menu.props.position = state === 'right' ? 'right' : state ? 'left' : 'center';
+			menu.props.slideOpen = state !== 'right' ? !this.state.slidemenuOpen : this.state.slidemenuOpen;
+        }
+        this.setState({slidemenuOpen: !this.state.slidemenuOpen, menu: menu});
+    },
+    slideMenuRender: function () {
+        return (
+			React.createElement("div", {className: "pageslider-container"}, 
+				this.state.menu
+			)
+		);
+    }
+}
+
+},{"react/addons":"/home/snow/projects/webkit/keystone-manager/node_modules/react/addons.js"}],"/home/snow/projects/webkit/keystone-manager/webkit/mixins/pageslider.js":[function(require,module,exports){
 var React =  require('react/addons');
 
 var PageSlider;
-module.exports = Nodes = {
+module.exports = PageSlider = {
     componentDidUpdate: function() {
         
     },
@@ -35448,7 +35992,46 @@ module.exports = Nodes = {
     }
 }
 
-},{"react/addons":"/home/snow/projects/webkit/keystone-manager/node_modules/react/addons.js"}],"/home/snow/projects/webkit/keystone-manager/webkit/pages/build.js":[function(require,module,exports){
+},{"react/addons":"/home/snow/projects/webkit/keystone-manager/node_modules/react/addons.js"}],"/home/snow/projects/webkit/keystone-manager/webkit/mixins/qflash.js":[function(require,module,exports){
+var React =  require('react');
+
+var QFlash;
+module.exports = QFlash = {
+    
+    qFlashRender: function () {
+        
+        return (
+			React.createElement("div", {className: "flash-messages"}, 
+				React.createElement("div", {style: "display:none;", class: "fademessage"}, 
+					React.createElement("div", {class: "html"}), 
+					React.createElement("div", {onClick: "snowUI.killFlash('message')", class: "killfademessage"}, 
+						React.createElement("button", {type: "button", class: "close"}, React.createElement("span", {"aria-hidden": "true"}, "×"), React.createElement("span", {class: "sr-only"}, "Close"))
+					)
+				), 
+				React.createElement("div", {style: "display:none;", class: "fadeloadingmessage"}, 
+					React.createElement("div", {class: "html"}), 
+					React.createElement("div", {onClick: "snowUI.killFlash('loadingmessage')", class: "killfademessage"}, 
+						React.createElement("button", {type: "button", class: "close"}, React.createElement("span", {"aria-hidden": "true"}, "×"), React.createElement("span", {class: "sr-only"}, "Close"))
+					)
+				), 
+				React.createElement("div", {class: "fadesuccess"}, 
+					React.createElement("div", {class: "html"}), 
+					React.createElement("div", {onClick: "snowUI.killFlash('success')", class: "killfademessage"}, 
+						React.createElement("button", {type: "button", class: "close"}, React.createElement("span", {"aria-hidden": "true"}, "×"), React.createElement("span", {class: "sr-only"}, "Close"))
+					)
+				), 
+				React.createElement("div", {style: "display:none;", class: "fadeerror"}, 
+					React.createElement("div", {class: "html"}), 
+					React.createElement("div", {onClick: "snowUI.killFlash('error')", class: "killfademessage"}, 
+						React.createElement("button", {type: "button", class: "close"}, React.createElement("span", {"aria-hidden": "true"}, "×"), React.createElement("span", {class: "sr-only"}, "Close"))
+					)
+				)
+			)
+		);
+    }
+}
+
+},{"react":"/home/snow/projects/webkit/keystone-manager/node_modules/react/react.js"}],"/home/snow/projects/webkit/keystone-manager/webkit/pages/build.js":[function(require,module,exports){
 
 var moment = require('moment');
 
@@ -35462,7 +36045,7 @@ var Route = Router.Route,
 	
 var Nodes = require('../components/nodes');
 
-var BuildState = require('../components/buildState');
+var BuildState = require('../components/buildstate');
 
 var Build;
 module.exports = Build = React.createClass({displayName: "Build",
@@ -35506,7 +36089,7 @@ module.exports = Build = React.createClass({displayName: "Build",
 					send.building = false;
 					send.built = true;
 					Manager.App.showNodes();
-					Manager.removeListener('build',_this._watchBuild);
+					//Manager.removeListener('build',_this._watchBuild);
 				}
 				_this.setState(send);
 			} else if(s.err) {
@@ -35566,7 +36149,8 @@ module.exports = Build = React.createClass({displayName: "Build",
 			startError: false,
 			done: false,
 			doneError: false,
-			building:false
+			building:false,
+			built: false
 		});
 		
 	},
@@ -35576,10 +36160,10 @@ module.exports = Build = React.createClass({displayName: "Build",
 		var id = Manager.doc.id;
 		if(confirm('Really Remove Build Directory?')) {
 			Manager.removeNodeBuildDir(id,function(err,success) {
-				console.log(err,success);
-				if(err)console.log(err);
+				Manager.log(err,success);
+				if(err)Manager.log(err);
 				if(success) {
-					console.log('force update after directory removed');
+					Manager.log('force update after directory removed');
 					_this.getDocs();
 					//_this.setState({loading:true});
 					//_this.forceUpdate();
@@ -35597,9 +36181,7 @@ module.exports = Build = React.createClass({displayName: "Build",
 		if(this.state.building || this.state.built) {
 			var buildProcess = (
 				React.createElement("div", null, 
-					React.createElement("p", null, 
-						React.createElement("a", {href: "#", onClick: this.stopBuilding}, "Build Again")
-					), 
+					
 					React.createElement(BuildState, {success: this.state.mkdir, error: this.state.mkdirError, working: this.state.mkdirWorking}, "Create Directory"), 
 					React.createElement(BuildState, {success: this.state.pkg, error: this.state.pkgError, working: this.state.pkgWorking}, "Create package.json"), 
 					React.createElement(BuildState, {success: this.state.models, error: this.state.modelsError, working: this.state.modelsWorking}, "Add Model Files"), 
@@ -35608,37 +36190,28 @@ module.exports = Build = React.createClass({displayName: "Build",
 					React.createElement(BuildState, {success: this.state.gzip, error: this.state.gzipError, working: this.state.gzipWorking}, "Create gzip file"), 
 					React.createElement(BuildState, {success: this.state.npm, error: this.state.npmError, working: this.state.npmWorking}, "Run npm install"), 
 					React.createElement(BuildState, {success: this.state.start, error: this.state.startError, working: this.state.startWorking}, "Run node keystone"), 
-					React.createElement(BuildState, {success: this.state.done, error: this.state.doneError, working: this.state.doneWorking}, "Finished")
+					React.createElement(BuildState, {success: this.state.done, error: this.state.doneError, working: this.state.doneWorking}, "Finished"), 
 					
-						
+					React.createElement("p", null, 
+						React.createElement("br", null), 
+						React.createElement("a", {href: "#", onClick: this.stopBuilding}, "Build Again")
+					)	
 				)			
 			);
-		}
-		if(this.state.building) {
-			var buildDiv = "col-xs-12";
-			var activeDiv = "hidden";
-		} else {
-			//var buildDiv = "col-xs-12 col-md-7";
-			//var activeDiv = "col-xs-12 col-md-5";
 			var buildDiv = "col-xs-12";
 			var activeDiv = "hidden";
 		}
+		
 		var database = Manager.config.mongo.value ? (React.createElement("span", null, "Collection: ", Manager.config.mongo.value, " ")) : (React.createElement("span", null, "Your mongo collection will be a sanitized form of ", React.createElement("b", null, Manager.config.name.value)));
-		return (
+		var ret = (
 			React.createElement("div", null, 
 				React.createElement("p", null), 
 				React.createElement("div", {className: ""}, 
-					React.createElement("p", null), 
-					React.createElement("div", {className: ""}, 
-						"Current Build:   ", React.createElement("b", null, Manager.doc.doc.name)
-					), 
-					React.createElement("p", null), 
 					React.createElement("div", {className: "clearfix"})
 				), 
 				React.createElement("p", null), 
 				React.createElement("div", {className: "clearfix"}), 
-				React.createElement("h3", null, "Build Configuration"), 
-				React.createElement("p", null), 
+				
 				React.createElement("div", {className: "form-group"}, 
 					React.createElement("label", {htmlFor: "path"}, "Path to Build Directory"), 
 					React.createElement("input", {type: "text", className: " form-control", id: "path", ref: "path", defaultValue: "testbed", placeholder: Manager.__dir})
@@ -35672,25 +36245,28 @@ module.exports = Build = React.createClass({displayName: "Build",
 					React.createElement("div", null, 
 						React.createElement("button", {type: "button", className: "btn btn-default", onClick: this.build, disabled: this.state.building}, "Build Configuration")
 					)
-				), 
-				React.createElement("div", null, 
-					React.createElement("div", {className: buildDiv}, 
-						React.createElement("h3", null, "Build"), 
-						buildProcess, 
-						React.createElement("div", {style: {position:'relative',height:150}})
-					), 
-					React.createElement("div", {className: activeDiv}, 
-						React.createElement("h3", null, "Active"), 
-						React.createElement(Nodes, {nodes: Manager._nodes, single: "true"})
-					)
 				)
+				
 				
 			)
 		);
+		if(this.state.building || this.state.built) {
+			return (
+				React.createElement("div", null, 
+					React.createElement("div", {className: buildDiv}, 
+						buildProcess, 
+						React.createElement("div", {style: {position:'relative',height:50}})
+					)
+				)
+			);
+		
+		} else {
+			return ret;
+		}
 	}
 });
 
-},{"../components/buildState":"/home/snow/projects/webkit/keystone-manager/webkit/components/buildState.js","../components/nodes":"/home/snow/projects/webkit/keystone-manager/webkit/components/nodes.js","moment":"/home/snow/projects/webkit/keystone-manager/node_modules/moment/moment.js","react":"/home/snow/projects/webkit/keystone-manager/node_modules/react/react.js","react-router":"/home/snow/projects/webkit/keystone-manager/node_modules/react-router/modules/index.js"}],"/home/snow/projects/webkit/keystone-manager/webkit/pages/configuration.js":[function(require,module,exports){
+},{"../components/buildstate":"/home/snow/projects/webkit/keystone-manager/webkit/components/buildstate.js","../components/nodes":"/home/snow/projects/webkit/keystone-manager/webkit/components/nodes.js","moment":"/home/snow/projects/webkit/keystone-manager/node_modules/moment/moment.js","react":"/home/snow/projects/webkit/keystone-manager/node_modules/react/react.js","react-router":"/home/snow/projects/webkit/keystone-manager/node_modules/react-router/modules/index.js"}],"/home/snow/projects/webkit/keystone-manager/webkit/pages/configuration.js":[function(require,module,exports){
 
 var moment = require('moment');
 
@@ -35833,10 +36409,7 @@ module.exports = Configuration = React.createClass({displayName: "Configuration"
 		React.createElement("div", null, 
 			React.createElement("p", null), 
 			React.createElement("div", {className: ""}, 
-					React.createElement("p", null), 
-					React.createElement("div", {className: ""}, 
-						"Current Build:   ", React.createElement("b", null, Manager.doc.doc.name)
-					), 
+					
 					React.createElement("p", null), 
 					React.createElement("div", {className: "clearfix"})
 				), 
@@ -35880,13 +36453,11 @@ module.exports = Load = React.createClass({displayName: "Load",
 		}
 	},
 	componentWillMount: function() {
-		//console.log('mount');
+		//Manager.log('mount');
 		this.forceUpdate();
 	},
 	componentDidMount: function() {
-		$(function () {
-			$('[data-toggle="tooltip"]').tooltip()
-		});
+		
 	},
 	getDocs: function(cb) {
 		if(!_.isFunction(cb))cb = function() {};
@@ -35906,15 +36477,18 @@ module.exports = Load = React.createClass({displayName: "Load",
 		});
 	},
 	componentWillUpdate: function() {
-		//console.log('update');
+		//Manager.log('update');
 		var _this = this;
 		
 		var load = this.getParams().load;
 		var unload = this.getParams().unload;
 		var to = this.getParams().to;
+		var newbuild = this.getParams().newbuild;
+		
+		//Manager.log(unload,load,to,newbuild);
 		
 		if(unload !== undefined) {
-			//console.log(unload,'unload');
+			//Manager.log(unload,'unload');
 			var remove = function() {
 				Manager.db.config.remove({ _id: unload }, {}, function (err, numRemoved) {
 					_this.getDocs(function() { _this.transitionTo('Load'); });
@@ -35929,10 +36503,14 @@ module.exports = Load = React.createClass({displayName: "Load",
 				if(to) {
 					_this.transitionTo(to);
 				} else {
-					_this.transitionTo('Version');
+					_this.transitionTo('Dashboard');
 				}
 				return false;
 			});
+			
+		} else if(newbuild === 'true') {
+		
+			_this.newDoc();
 			
 		} else if(this.state.loading === true) {
 		
@@ -35940,32 +36518,24 @@ module.exports = Load = React.createClass({displayName: "Load",
 		}
 			
 	},
-	newDoc: function() {
-		var _this = this;
-		Manager.newDoc(function() {
-			_this.transitionTo('Version');
-			return false;
-		});
+	newDoc: function(e) {
+		if(e)e.preventDefault();
+		Manager.App.createProject();
 	},
 	confirmDelete: function(e) {
-		if(!confirm('Really Delete?')) {
-			e.preventDefault();
-		}
+		e.preventDefault();
+		Manager.App.confirmDeleteProject(e.target.dataset.id || e.target.parentElement.dataset.id);
 	},
 	endNode: function(e) {
 		e.preventDefault();
-		var _this = this;
-		var id = e.target.dataset.id;
-		Manager._nodes[id].methods.endNode(function() {
-			Manager.App.forceUpdate();
-		});
+		Manager.App.stopNode(e.target.dataset.id || e.target.parentElement.dataset.id);
 	},
 	startNode: function(e) {
 		var _this = this;
 		e.preventDefault();
-		var id = e.target.dataset.id;
+		var id = e.target.dataset.id  || e.target.parentElement.dataset.id;
 		Manager.startNode(id,function() {
-			//console.log('transition to Nodes');
+			//Manager.log('transition to Nodes');
 			//_this.transitionTo('Nodes');
 			Manager.App.showNodes();
 		});
@@ -35974,17 +36544,10 @@ module.exports = Load = React.createClass({displayName: "Load",
 	removeNodeDir: function(e) {
 		var _this = this;
 		e.preventDefault();
-		var id = e.target.dataset.id;
-		if(confirm('Really Remove Build Directory?')) {
-			Manager.removeNodeBuildDir(id,function(err,success) {
-				
-				if(err)console.log(err);
-				if(success) {
-					_this.getDocs();
-				}
-			});
-		}
-			
+		var id = e.target.dataset.id || e.target.parentElement.dataset.id;
+		Manager.App.removeNodeBuildDir(id,function(){
+			_this.getDocs();
+		});	
 	},
 	render: function() {
 		
@@ -35997,7 +36560,9 @@ module.exports = Load = React.createClass({displayName: "Load",
 			saved.push(React.createElement("tr", {key: "load"}, React.createElement("td", {colSpan: "5"}, "Loading...")));
 		} else {
 			_.each(this.state.docs,function(v) {
-				var start = Manager._nodes[v._id] && Manager._nodes[v._id].id ? React.createElement("a", {href: "#", onClick: _this.endNode, "data-id": v._id}, "Stop") : (v.build && v.build.path) ? React.createElement("a", {href: "#", onClick: _this.startNode, "data-id": v._id}, "Start") : React.createElement(Link, {to: "LoadTo", params: {load:v._id,to:'Build'}}, "Build");
+				// var start = Manager._nodes[v._id] && Manager._nodes[v._id].id ? <a href="#" onClick={_this.endNode} data-id={v._id} >Stop</a> : (v.build && v.build.path) ? <a href="#" onClick={_this.startNode} data-id={v._id} >Start</a> : <Link to="LoadTo" params={{load:v._id,to:'Build'}} >Build</Link>;
+				
+				var start = Manager._nodes[v._id] && Manager._nodes[v._id].id ? React.createElement("a", {href: "#", onClick: _this.endNode, "data-id": v._id}, React.createElement("span", {className: "glyphicon glyphicon-stop  text-success", "data-toggle": "tooltip", "data-placement": "bottom", title: "Stop the node"})) : (v.build && v.build.path) ? React.createElement("a", {href: "#", onClick: _this.startNode, "data-id": v._id}, React.createElement("span", {className: "glyphicon glyphicon-play-circle text-warning", "data-toggle": "tooltip", "data-placement": "bottom", title: "Start the node"})) : v.temp ? React.createElement("span", null) : React.createElement(Link, {to: "LoadTo", params: {load:v._id,to:'Build'}}, React.createElement("span", {className: "glyphicon glyphicon-wrench", "data-toggle": "tooltip", "data-placement": "bottom", title: "Build this configuration"}));
 				var removeDir;
 				
 				var finish = function() {
@@ -36012,16 +36577,19 @@ module.exports = Load = React.createClass({displayName: "Load",
 								v.build && v.build.options ? v.build.options.version : v.version
 							), 
 							React.createElement("td", null, 
+								v.build && v.build.options ? v.build.options.port : ''
+							), 
+							React.createElement("td", {style: {fontSize:21}}, 
 								start
 							), 
-							React.createElement("td", null, 
+							React.createElement("td", {style: {fontSize:21}}, 
 								removeDir
 							), 
 							React.createElement("td", null, 
 								moment(v.today).format("lll")
 							), 
-							React.createElement("td", {className: " unloadDiv"}, 
-								Manager.doc && Manager.doc.id !== v._id ? (React.createElement("a", {href: href, onClick: _this.confirmDelete}, React.createElement("span", {className: "glyphicon glyphicon-trash"}), " ")) : ''
+							React.createElement("td", {className: " unloadDiv", style: {fontSize:18}}, 
+								Manager.doc && Manager.doc.id !== v._id ? (React.createElement("a", {href: "#", "data-id": v._id, onClick: _this.confirmDelete}, React.createElement("span", {className: "glyphicon glyphicon-trash   text-danger"}), " ")) : ''
 							)
 							
 						)
@@ -36035,7 +36603,7 @@ module.exports = Load = React.createClass({displayName: "Load",
 				}
 				
 				if(_.isObject(v.build) && v.build.path) {
-					removeDir = (React.createElement("a", {href: "#", onClick: _this.removeNodeDir, "data-id": v._id}, "Delete Build"));
+					removeDir = (React.createElement("a", {href: "#", onClick: _this.removeNodeDir, "data-id": v._id}, React.createElement("span", {className: "glyphicon glyphicon-remove-circle text-muted", "data-toggle": "tooltip", "data-placement": "bottom", title: "Remove build directory"})));
 					finish();
 				} else {
 					finish();
@@ -36048,30 +36616,30 @@ module.exports = Load = React.createClass({displayName: "Load",
 				React.createElement("p", null), 
 				
 				React.createElement("div", {className: ""}, 
-					React.createElement("p", null), 
-					React.createElement("div", {className: ""}, 
-						"Current Build:   ", React.createElement("b", null, Manager.doc.doc.name)
-					), 
+					
+					
 					React.createElement("p", null), 
 					React.createElement("div", {className: "clearfix"})
 				), 
 				React.createElement("p", null), 
-				React.createElement("p", null, 
-					React.createElement("button", {className: "btn btn-primary", onClick: this.newDoc}, "New Build")
+				React.createElement("p", null
+					
 				), 
 				React.createElement("div", {role: "tabpanel"}, 
 					React.createElement("ul", {className: "nav nav-tabs", role: "tablist"}, 
 						React.createElement("li", {role: "presentation", className: "active"}, React.createElement("a", {href: "#saved", "aria-controls": "home", role: "tab", "data-toggle": "tab"}, "Saved Builds")), 
-						React.createElement("li", {role: "presentation"}, React.createElement("a", {href: "#temp", "aria-controls": "profile", role: "tab", "data-toggle": "tab"}, "Temp Builds"))
+						React.createElement("li", {role: "presentation"}, React.createElement("a", {href: "#temp", "aria-controls": "profile", role: "tab", "data-toggle": "tab"}, "Temp Builds")), 
+						React.createElement("li", {role: "presentation", className: "pull-right"}, React.createElement("button", {className: "btn btn-primary", onClick: this.newDoc}, " ", React.createElement("span", {className: "glyphicon glyphicon-plus"}), " New Build"))
 					), 
 					React.createElement("div", {className: "tab-content"}, 
-						React.createElement("div", {role: "tabpanel", className: "tab-pane active", id: "saved"}, 
+						React.createElement("div", {role: "tabpanel", className: "tab-pane  active", id: "saved"}, 
 							React.createElement("table", {className: "table table-hover"}, 
 								React.createElement("thead", null, 
 									React.createElement("th", null, "Name"), 
 									React.createElement("th", null, "Ver"), 
+									React.createElement("th", null, "Port"), 
 									React.createElement("th", null, "Action"), 
-									React.createElement("th", null, "Delete Build"), 
+									React.createElement("th", null, "Build"), 
 									React.createElement("th", null, "Created"), 
 									React.createElement("th", null, "Delete")
 								), 
@@ -36081,14 +36649,15 @@ module.exports = Load = React.createClass({displayName: "Load",
 							)
 							
 						), 
-						React.createElement("div", {role: "tabpanel", className: "tab-pane", id: "temp"}, 
+						React.createElement("div", {role: "tabpanel", className: "tab-pane ", id: "temp"}, 
 							React.createElement("table", {className: "table table-hover"}, 
 								React.createElement("thead", null, 
 									
 									React.createElement("th", null, "Name"), 
 									React.createElement("th", null, "Ver"), 
+									React.createElement("th", null, "Port"), 
 									React.createElement("th", null, "Action"), 
-									React.createElement("th", null, "Delete Build"), 
+									React.createElement("th", null, "Build"), 
 									React.createElement("th", null, "Created"), 
 									React.createElement("th", null, "Delete")
 								), 
@@ -36150,10 +36719,7 @@ module.exports = Models =  React.createClass({displayName: "Models",
 			React.createElement("div", {id: "Models", className: "form"}, 
 				React.createElement("p", null), 
 				React.createElement("div", {className: ""}, 
-					React.createElement("p", null), 
-					React.createElement("div", {className: ""}, 
-						"Current Build:   ", React.createElement("b", null, Manager.doc.doc.name)
-					), 
+					
 					React.createElement("p", null), 
 					React.createElement("div", {className: "clearfix"})
 				), 
@@ -36224,26 +36790,43 @@ module.exports = Modules = React.createClass({displayName: "Modules",
 	
 	saveValue: function(e) {
 		var module = this.refs.module.getDOMNode().value;
-		var version = this.refs.version.getDOMNode().value;
+		var version = this.refs.version.getDOMNode().value || 'latest';
 		//console.log('save value',module,version);
 		Manager.modules.push({module:module,version:version});
 		Manager.updateDoc({modules:Manager.modules});
+		
+		this.refs.version.getDOMNode().value = '';
+		this.refs.module.getDOMNode().value = '';
 		this.forceUpdate();
 	},
 	deleteItem: function(e) {
+		
 		e.preventDefault();
-		if(confirm('Really Delete?')) {
-			var el = $(e.target).closest('a');
+		var el = $(e.target).closest('a');
+		var _this = this;
+		
+		Manager.App.modal({
+			who:'delete module',
+			children: React.createElement("div", {className: "center-content"}, React.createElement("h3", null, "Delete Module?")),
+			confirm: true,
+			class: 'modal-sm',
+		}, function() {
 			var newModules = [];
 			_.each(Manager.modules,function(v) {
-				if(v.module !== el[0].dataset.module && v.version !== el[0].dataset.version) {
+				if(v.module === el[0].dataset.module && v.version === el[0].dataset.version) {
+					// weird
+				} else {
 					newModules.push(v);
-				}				
-			},this);
+				}		
+			});
 			Manager.modules = newModules;
-			Manager.updateDoc({modules:Manager.modules});
-			this.forceUpdate();
-		}
+			Manager.updateDoc({modules:Manager.modules},function() {
+				_this.forceUpdate();
+				Manager.App.qFlash('message','Module removed as dependency',2000);
+			});
+			
+		});
+		
 	},
 	render: function() {
 		var _this = this;
@@ -36257,10 +36840,7 @@ module.exports = Modules = React.createClass({displayName: "Modules",
 			React.createElement("div", null, 
 				React.createElement("p", null), 
 				React.createElement("div", {className: ""}, 
-					React.createElement("p", null), 
-					React.createElement("div", {className: ""}, 
-						"Current Build:   ", React.createElement("b", null, Manager.doc.doc.name)
-					), 
+					
 					React.createElement("p", null), 
 					React.createElement("div", {className: "clearfix"})
 				), 
@@ -36317,18 +36897,31 @@ module.exports = Routes = React.createClass({displayName: "Routes",
 	},
 	deleteItem: function(e) {
 		e.preventDefault();
-		if(confirm('Really Delete?')) {
-			var el = $(e.target).closest('a');
+		var el = $(e.target).closest('a');
+		var _this = this;
+		
+		Manager.App.modal({
+			who:'delete route',
+			children: React.createElement("div", {className: "center-content"}, React.createElement("h3", null, "Delete Route?")),
+			confirm: true,
+			class: 'modal-sm',
+		}, function() {
 			var newRoutes = [];
-			_.each(Manager.modules,function(v) {
-				if(v.routeKey !== el[0].dataset.routeKey && v.route !== el[0].dataset.route) {
+			_.each(Manager.routes,function(v) {
+				if(v.routeKey === el[0].dataset.routeKey && v.route === el[0].dataset.route) {
+					// weird
+				} else {
 					newRoutes.push(v);
-				}				
+				}					
 			},this);
 			Manager.routes = newRoutes;
-			Manager.updateDoc({routes:Manager.routes});
-			this.forceUpdate();
-		}
+			Manager.updateDoc({routes:Manager.routes},function() {
+				_this.forceUpdate();
+				Manager.App.qFlash('message','Route removed',2000);
+			});
+			
+		});
+		
 	},
 	render: function() {
 		var _this = this;
@@ -36343,10 +36936,7 @@ module.exports = Routes = React.createClass({displayName: "Routes",
 			React.createElement("div", null, 
 				React.createElement("p", null), 
 				React.createElement("div", {className: ""}, 
-					React.createElement("p", null), 
-					React.createElement("div", {className: ""}, 
-						"Current Build:   ", React.createElement("b", null, Manager.doc.doc.name)
-					), 
+					
 					React.createElement("p", null), 
 					React.createElement("div", {className: "clearfix"})
 				), 
@@ -36376,7 +36966,13 @@ module.exports = Routes = React.createClass({displayName: "Routes",
 						React.createElement("h4", null, "Routes"), 
 						routes
 					)
-				)
+				), 
+				React.createElement("p", null, 
+					React.createElement("br", null), 
+					React.createElement("br", null), 
+					React.createElement("br", null)
+				), 
+				React.createElement("p", null)
 			)
 		);
 	}
@@ -36392,16 +36988,23 @@ var Link = Router.Link;
 
 var Save;
 module.exports = Save = React.createClass({displayName: "Save",
-	
+	getInitialState: function() {
+		return {
+			name: !Manager.doc.doc.temp ? Manager.doc.doc.name : ''
+		}
+	},
 	saveValue: function(e) {
 		var _this = this;
 		var name = this.refs.name.getDOMNode().value;
 		console.log('save config',name);
 		if(!name)return;
 		Manager.updateDoc({name:name,temp:false},function(){
-			_this.forceUpdate();	
+			Manager.App.forceUpdate();	
 		});
 		
+	},
+	onChange: function(e) {
+		this.setState({name: e.target.value});
 	},
 	render: function() {
 		
@@ -36425,19 +37028,19 @@ module.exports = Save = React.createClass({displayName: "Save",
 				React.createElement("div", {className: "clearfix"}), 
 				React.createElement("p", null), 
 				React.createElement("div", {className: "form-group"}, 
-					React.createElement("label", {htmlFor: "path", className: "col-sm-3 control-label"}, "_id"), 
-						React.createElement("div", {className: "col-sm-9"}, 
+					React.createElement("label", {htmlFor: "path", className: "col-sm-2 control-label"}, "_id"), 
+						React.createElement("div", {className: "col-sm-10"}, 
 							React.createElement("p", {className: "form-control-static"}, Manager.doc.id)
 						)
 				), 
 				React.createElement("div", {className: "form-group"}, 
-					React.createElement("label", {htmlFor: "name", className: "col-sm-3 control-label"}, "Name"), 
-						React.createElement("div", {className: "col-sm-9"}, 
-							React.createElement("input", {type: "text", className: " form-control", id: "name", ref: "name", defaultValue: name})
+					React.createElement("label", {htmlFor: "name", className: "col-sm-2 control-label"}, "Name"), 
+						React.createElement("div", {className: "col-sm-10"}, 
+							React.createElement("input", {type: "text", className: " form-control", id: "name", ref: "name", value: this.state.name, onChange: this.onChange})
 						)
 				), 
 				React.createElement("div", {className: "form-group"}, 
-					React.createElement("div", {className: "col-sm-offset-3 col-sm-9"}, 
+					React.createElement("div", {className: "col-sm-offset-2 col-sm-10"}, 
 						React.createElement("button", {type: "button", className: "btn btn-default", onClick: this.saveValue}, saveText)
 					)
 				), 
@@ -36459,7 +37062,90 @@ module.exports = Save = React.createClass({displayName: "Save",
 });
 
 
-},{"moment":"/home/snow/projects/webkit/keystone-manager/node_modules/moment/moment.js","react":"/home/snow/projects/webkit/keystone-manager/node_modules/react/react.js","react-router":"/home/snow/projects/webkit/keystone-manager/node_modules/react-router/modules/index.js"}],"/home/snow/projects/webkit/keystone-manager/webkit/pages/version.js":[function(require,module,exports){
+},{"moment":"/home/snow/projects/webkit/keystone-manager/node_modules/moment/moment.js","react":"/home/snow/projects/webkit/keystone-manager/node_modules/react/react.js","react-router":"/home/snow/projects/webkit/keystone-manager/node_modules/react-router/modules/index.js"}],"/home/snow/projects/webkit/keystone-manager/webkit/pages/slidenodes.js":[function(require,module,exports){
+
+var React =  require('react');
+
+var Nodes = require('../components/nodes');
+
+var SlideNodes;
+module.exports = SlideNodes = React.createClass({displayName: "SlideNodes",
+    
+    getInitialState: function () {
+		return {
+			nodesViewList: _.size(Manager._nodes) > 0 ? false : true,
+			norender: this.props.norender
+		}
+		
+	},
+	getDefaultProps: function () {
+		return {
+			norender: false,
+			position: 'left',
+		}
+		
+	},
+	componentWillReceiveProps: function(p) {
+		if(p.norender)this.setState({norender:p.norender});
+	},
+	componentWillUpdate: function() {
+		//if(!this.state.nodesViewList && _.size(Manager._nodes) > 1) this.setState({nodesViewList:true,norender:false});
+		
+	},
+    closeNodes: function(e) {
+		if(e)e.preventDefault();
+		Manager.App.slidePage(React.createElement(SlideNodes, {key: "Nodes", norender: true}));
+	},
+	wideNodes: function(e) {
+		if(e)e.preventDefault();
+		Manager.App.slidePage(React.createElement(SlideNodes, {key: "Nodes", norender: true}),'wide');
+	},
+	changeView: function(e) {
+		if(e)e.preventDefault();
+		this.setState({nodesViewList:!this.state.nodesViewList,norender:false});
+	},
+    render: function () {
+        var ret;
+        if(this.props.slideOpen) {
+			if(!this.state.nodesViewList) {
+				var view = React.createElement("a", {href: "#", onClick: this.changeView}, React.createElement("span", {className: "text-muted glyphicon glyphicon-th-large"}))
+			} else {
+				var view = React.createElement("a", {href: "#", onClick: this.changeView}, React.createElement("span", {className: "text-muted glyphicon glyphicon-th-list"}))
+			}
+			var widenode;
+			if(this.props.position !== 'left') {
+				widenode = (
+					React.createElement("div", {className: "slideHead text-primary col-xs-1", onClick: this.wideNodes}, 
+						React.createElement("span", {className: "glyphicon glyphicon-chevron-left"})
+					)
+				);
+			}
+			ret = (
+				React.createElement("div", null, 
+					widenode, 
+					React.createElement("div", {className: "slideHead text-primary col-xs-9", onClick: this.closeNodes}, 
+						React.createElement("span", {className: "glyphicon glyphicon-chevron-right"})
+					), 
+					React.createElement("div", {className: "slideHead text-right  col-xs-2"}, 
+						view
+					), 
+					
+					React.createElement("div", {className: "clearfix"}), 
+					React.createElement("div", {className: "slideContent"}, 
+						React.createElement(Nodes, {single: !this.state.nodesViewList, norender: this.state.norender})
+					)
+				)
+			);
+		}
+        return (
+            React.createElement("div", {className: "page " + this.props.position}, 
+				ret
+            )
+        );
+    }
+});
+
+},{"../components/nodes":"/home/snow/projects/webkit/keystone-manager/webkit/components/nodes.js","react":"/home/snow/projects/webkit/keystone-manager/node_modules/react/react.js"}],"/home/snow/projects/webkit/keystone-manager/webkit/pages/version.js":[function(require,module,exports){
 
 var moment = require('moment');
 
@@ -36508,6 +37194,8 @@ module.exports = Version = React.createClass({displayName: "Version",
 		
 		var val = event.target.value;
 		
+		this.refs.typen.getDOMNode().checked = true;
+		
 		_this.setState({change:true,pkg:JSON.stringify({loading:true}, null, 4)});
 		
 		Manager.getView(val,function(err,data) {
@@ -36531,6 +37219,8 @@ module.exports = Version = React.createClass({displayName: "Version",
 		var _this = this;
 		
 		var val = event.target.value;
+		
+		this.refs.typeb.getDOMNode().checked = true;
 		
 		_this.setState({change:true,pkg:JSON.stringify({loading:true}, null, 4)});
 		
@@ -36570,10 +37260,7 @@ module.exports = Version = React.createClass({displayName: "Version",
 		return (
 			React.createElement("div", null, 
 				React.createElement("div", {className: ""}, 
-					React.createElement("p", null), 
-					React.createElement("div", {className: ""}, 
-						"Current Build:   ", React.createElement("b", null, Manager.doc.doc.name)
-					), 
+					
 					React.createElement("p", null), 
 					React.createElement("div", {className: "clearfix"})
 				), 
@@ -36585,7 +37272,7 @@ module.exports = Version = React.createClass({displayName: "Version",
 					
 					React.createElement("div", {className: "form-group"}, 
 						React.createElement("label", {className: "checkbox-inline"}, 
-							React.createElement("input", {type: "radio", onChange: this.changeType, name: "type", ref: "type", value: "module", defaultChecked: Manager.doc.doc.type === 'module'}), " Npm Version"
+							React.createElement("input", {type: "radio", onChange: this.changeType, name: "type", ref: "typen", value: "module", defaultChecked: Manager.doc.doc.type === 'module'}), " Npm Version"
 						), 
 						 " ", 
 						React.createElement("select", {ref: "npm", id: "npm", name: "npm", onChange: this.getVersion, className: "form-control", defaultValue: Manager.version}, 
@@ -36600,7 +37287,7 @@ module.exports = Version = React.createClass({displayName: "Version",
 				
 					React.createElement("div", {className: "form-group"}, 
 						React.createElement("label", {className: "checkbox-inline"}, 
-							React.createElement("input", {type: "radio", onChange: this.changeType, name: "type", ref: "type", value: "branch", defaultChecked: Manager.doc.doc.type === 'branch'}), " Github Branch"
+							React.createElement("input", {type: "radio", onChange: this.changeType, name: "type", ref: "typeb", value: "branch", defaultChecked: Manager.doc.doc.type === 'branch'}), " Github Branch"
 						), 
 						 " ", 
 						React.createElement("select", {ref: "git", id: "git", name: "git", onChange: this.getPackage, className: "form-control", defaultValue: Manager.version || _.keys(Manager.current)[0]}, 

@@ -32,29 +32,43 @@ pre {
 	height: 50px;
 	width: 100%;
 	position: fixed;
-}	
-#infoBar .infoBarLinks {
-	padding:5px;
-	font-size: 24px;
-	font-weight: normal;
+}
+
+#infoBar .build h3{
+	margin-top:12px;
+}
 	
+#infoBar .infoBarLinks {
+	padding:7px;
+	font-size: 22px;
+	font-weight: normal;
+	overflow: hidden;
+	height: 50px;
 }
 #infoBar #infoBarLinks {
 	/*background: #27282D;*/
 	height: 50px;
 	color: #4A4A4A;	
 }
+#infoBar #infoBarLinks .list {
+	overflow: hidden;
+	float:left;
+	height: 50px;
+	
+}
 #infoBar #infoBarLinks .glyphicon {
 	margin:5px 10px;
+	letter-spacing: -1px;
+	word-spacing: -15px;
 }
 #infoBar .infoBarInfo {
 	height: 50px;
-	padding:8px 10px;
+	padding:10px 10px;
 }
 	
 #infoBar #infoBarInfo .link {
 	font-size: 24px;
-	padding:5px;
+	padding:8px;
 } 
 
 #infoBar .nodes {
@@ -67,10 +81,39 @@ pre {
 	text-decoration:none;
 	cursor:pointer;
 }
+#infoBar .nodes .transfer {
+	font-size: 28px;
+	padding-top:1px;
+	float:right;
+	margin-right:15px;
+}
 
 #infoBar .nodes a{
 	color: #fff;
 	text-decoration:none;
+}
+
+#infoBar .dashboard {
+	padding:9px 0px;
+	font-size: 26px;
+	font-weight: normal;
+	height: 50px;
+	color: #fff;	
+	text-align:center;
+	text-decoration:none;
+	cursor:pointer;
+	margin-right:15px;
+}
+#infoBar .play {
+	padding:9px 0px;
+	font-size: 26px;
+	font-weight: normal;
+	height: 50px;
+	color: #fff;	
+	text-align:center;
+	text-decoration:none;
+	cursor:pointer;
+	margin-right:15px;
 }
 
 #infoContent #itemList {
@@ -79,7 +122,7 @@ pre {
 	left: 0;
 	top: 0;
 	height:100%;
-	background: #ffffff;
+	/*background: #ffffff;*/
 	
 }
 #infoContent {
@@ -140,5 +183,140 @@ pre {
 
 #Nodes .nodes {
 	margin-top: 10px;
-	cursor:pointer;
+	
+}
+
+.logoman {
+	position:relative;
+	width:35px;
+	font-family:'Courgette',cursive;
+	margin-top:5px
+}
+.logoman div {
+	float:left
+}
+.flip {
+	-ms-transform:rotate(180deg);
+	-webkit-transform:rotate(180deg);
+	transform:rotate(180deg);
+}
+.dotdot { 
+	margin-top:2px
+}
+@keyframes shake {
+	0%,100%{transform:translateX(0)}
+	20%,60%{transform:translateX(-10px)}
+	40%,80%{transform:translateX(10px)}
+}
+@-webkit-keyframes shake {
+	0%,100%{-webkit-transform:translateX(0)}
+	20%,60%{-webkit-transform:translateX(-10px)}
+	40%,80%{-webkit-transform:translateX(10px)}
+}
+@keyframes apparate {
+	0%{opacity:0}
+	100%{opacity:1}
+}
+@-webkit-keyframes apparate {
+	0%{opacity:0}
+	100%{opacity:1}
+}
+.flash-messages {
+	
+
+}
+.fadesuccess {
+    font-size: 15px;
+    background-color: #5B8649;
+    color: #D7F0D8;
+    font-weight: bold;
+    text-align: center;
+    padding: 10px 5px 5px;
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    height: 55px;
+    width: 100%;
+    z-index: 10000;
+}
+.fadeloadingmessage {
+    background-color: #4498C2;
+    
+    color: #fff;
+    font-size: 15px;
+    font-weight: bold;
+    text-align: center;
+    padding: 10px 5px 5px;
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    height: 55px;
+    width: 100%;
+    z-index: 10000;
+}
+.fademessage {
+    background-color: #49618F;
+    background-color: #2FA4E7;
+    
+    color: #fff;
+    font-size: 15px;
+    font-weight: bold;
+    text-align: center;
+    padding: 10px 5px 5px;
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    height: 55px;
+    width: 100%;
+    z-index: 10000;
+}
+.fadeerror {
+    background-color: #6b4644;
+    color: #fff;
+    font-size: 15px;
+    font-weight: bold;
+    text-align: center;
+    padding: 5px;
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    height: 55px;
+    width: 100%;
+    z-index: 10000;
+}
+
+.killfademessage {
+	position: absolute;
+	right:10px;
+	top:5px;
+	width:30px;
+	height:30px;
+	
+}
+.modal-content {
+	background:#2FA4E7;
+	color:#fff;
+	border-radius: 0;
+}
+.modal-footer {
+	background: #fff;
+}
+.modal-content h3{
+	color:#fff;
+}
+.modal-body,.modal-header,.modal-footer {
+	border: none;
+}
+.modal-body {
+	padding: 0px 15px 10px 15px;
+}
+.modal-header {
+	padding: 10px 15px 0px 15px;
+}
+.center-content {
+	text-align:center;
 }

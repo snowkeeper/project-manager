@@ -1,7 +1,7 @@
 var React =  require('react/addons');
 
 var PageSlider;
-module.exports = Nodes = {
+module.exports = PageSlider = {
     componentDidUpdate: function() {
         
     },
